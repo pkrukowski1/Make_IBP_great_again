@@ -17,7 +17,6 @@ def load_model(model: nn.Module, weight_path: str, device: str = "cpu") -> None:
     Returns:
         None
     """
-    
     state_dict = torch.load(weight_path, map_location=device)
     state_dict = state_dict.get("state_dict", state_dict)
     if isinstance(state_dict, list):

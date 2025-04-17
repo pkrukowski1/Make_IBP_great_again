@@ -1,7 +1,7 @@
 _target_: network.ResNet5
 
 block:
-  _target_: network.BasicBlock
+  _target_: BasicBlock
 
 num_blocks: 2
 num_classes: 10
