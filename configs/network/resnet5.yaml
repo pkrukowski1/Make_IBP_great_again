@@ -8,3 +8,4 @@ num_classes: 10
 in_planes: 8
 bn: false
 last_layer: dense
+model_path: ${oc.env:MODEL_DIR}/cifar_resnet5_8px.pth

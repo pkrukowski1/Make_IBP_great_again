@@ -2,3 +2,4 @@ _target_: network.MLP
 activation_fnc:
   _target_: torch.nn.ReLU
 layers: [[100,100,100,100,100,100]]
+model_path: ${oc.env:MODEL_DIR}/mnist_6_100_nat.pth

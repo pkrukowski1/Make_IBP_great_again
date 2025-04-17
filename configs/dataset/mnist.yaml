@@ -2,4 +2,5 @@ _target_: torch.utils.data.DataLoader
 dataset:
   _target_: dataset.MNIST
   data_path: ${oc.env:DATA_DIR}/mnist
+  train: false
 batch_size: 1
