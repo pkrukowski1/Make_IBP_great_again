@@ -1,0 +1,10 @@
+_target_: network.ResNet5
+
+block:
+  _target_: network.BasicBlock
+
+num_blocks: 2
+num_classes: 10
+in_planes: 8
+bn: false
+last_layer: dense

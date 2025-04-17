@@ -1,0 +1,5 @@
+_target_: torch.utils.data.DataLoader
+dataset:
+  _target_: dataset.svhn
+  data_path: ${oc.env:DATA_DIR}/svhn
+batch_size: 1

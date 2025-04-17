@@ -1,0 +1,5 @@
+_target_: dataset.CIFAR10Dataset
+dataset:
+  _target_: dataset.cifar10
+  data_path: ${oc.env:DATA_DIR}/cifar10
+batch_size: 1

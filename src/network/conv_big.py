@@ -1,0 +1,109 @@
+from torch import nn
+import torch
+
+import logging
+
+from .utils import load_model
+
+log = logging.getLogger(__name__)
+
+
+class ConvBig(nn.Module):
+    """
+    ConvBig: A convolutional neural network model for feature extraction and classification.
+    This class defines a convolutional neural network with multiple convolutional layers 
+    for feature extraction, followed by fully connected layers for classification. The 
+    model can optionally load pre-trained weights from a specified file path.
+    Attributes:
+        in_channels (int): The number of input channels for the convolutional layers.
+        dim_out (int): The number of output dimensions for the final classification layer.
+        model_path (str, optional): Path to a pre-trained model file. If provided, the model 
+            weights will be loaded from this file.
+    Methods:
+        __init__(in_channels: int, dim_out: int, model_path: str = None):
+            Initializes the ConvBig model with the specified input channels, output dimensions, 
+            and an optional path to a pre-trained model.
+        _build() -> nn.Sequential:
+            Constructs the feature extractor and classifier components of the model. Dynamically 
+            determines the number of features after flattening to configure the fully connected layers.
+        forward(x: torch.Tensor) -> torch.Tensor:
+            Defines the forward pass of the model. Takes an input tensor `x` and returns the 
+            output tensor after passing through the network.
+    """
+    def __init__(self, in_channels: int, dim_out: int, model_path: str = None) -> None:
+        """
+        Initializes the class with the given parameters.
+        Args:
+            in_channels (int): The number of input channels for the model.
+            dim_out (int): The dimensionality of the output.
+            model_path (str, optional): Path to a pre-trained model to load. Defaults to None.
+        Attributes:
+            model (nn.Module): The neural network model built by `_build` method.
+            in_channels (int): The number of input channels for the model.
+            dim_out (int): The dimensionality of the output.
+        Side Effects:
+            If `model_path` is provided, loads the model from the specified path and logs the action.
+        """
+        super().__init__()
+        self.model = self._build()
+
+        self.in_channels = in_channels
+        self.dim_out = dim_out
+        
+        if model_path is not None:
+            load_model(self.model, model_path)
+            log.info(f"Model loaded from {model_path}")
+
+    def _build(self) -> nn.Sequential:
+        """
+        Builds a neural network model consisting of a feature extractor and a classifier.
+        The feature extractor is a sequence of convolutional layers with ReLU activations,
+        followed by a flattening layer. The classifier is a sequence of fully connected
+        layers with ReLU activations, culminating in an output layer with the specified
+        number of output dimensions.
+        Returns:
+            nn.Sequential: A sequential container combining the feature extractor and classifier.
+        Notes:
+            - The number of features after the flattening layer is dynamically determined
+              using a dummy input tensor with the specified input dimensions.
+            - The input dimensions (self.in_channels, self.input_height, self.input_width)
+              and output dimensions (self.dim_out) must be defined as attributes of the class.
+        """
+
+        feature_extractor = nn.Sequential(
+            nn.Conv2d(self.in_channels, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(32, 32, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Flatten()
+        )
+
+        # Dynamically determine the number of features after flattening
+        with torch.no_grad():
+            dummy_input = torch.zeros(1, self.in_channels, self.input_height, self.input_width)
+            hidden_units = feature_extractor(dummy_input).shape[1]
+
+        classifier = nn.Sequential(
+            nn.Linear(hidden_units, 512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, self.dim_out)
+        )
+
+        return nn.Sequential(feature_extractor, classifier)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Defines the forward pass of the neural network.
+        Parameters:
+            x (torch.Tensor): The input tensor to the network.
+        Returns:
+            torch.Tensor: The output tensor after passing through the model.
+        """
+
+        return self.model(x)

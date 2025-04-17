@@ -1,0 +1,7 @@
+*/__pycache__
+.vscode/
+data/
+src/network/models
+.env
+*/*/__pycache__
+outputs
