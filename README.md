@@ -34,3 +34,6 @@ edit .env
 conda activate IBP_great_again
 WANDB_MODE={offline/online} HYDRA_FULL_ERROR={0/1} python src/main.py --config-name config 
 ```
+
+## Acknowledgements
+- Project Structure based on [template](https://github.com/sobieskibj/templates/tree/master) by Bartłomiej Sobieski
