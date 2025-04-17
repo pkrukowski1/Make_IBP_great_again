@@ -9,41 +9,34 @@ class CIFAR10(Dataset):
     """
     CIFAR10 Dataset Wrapper
     This class provides a wrapper around the CIFAR-10 dataset, allowing for easy access
-    to both training and testing data. It supports indexing and provides the total length
-    of the combined dataset.
+    to either training or testing data. It supports indexing and provides the total length
+    of the dataset.
     Attributes:
-        train_data (torch.utils.data.Dataset): The training dataset for CIFAR-10.
-        test_data (torch.utils.data.Dataset): The testing dataset for CIFAR-10.
+        data (torch.utils.data.Dataset): The CIFAR-10 dataset (either training or testing).
     Methods:
-        __init__(data_path: str = './data'):
+        __init__(data_path: str = './data', train: bool = False):
             Initializes the CIFAR10 dataset wrapper by downloading and preparing
-            the training and testing datasets.
+            either the training or testing dataset based on the `train` flag.
         __len__():
-            Returns the total number of samples in both the training and testing datasets.
-        __getitem__(idx: int, train: bool):
-            Retrieves a single sample from the dataset. If `train` is True, the sample
-            is retrieved from the training dataset; otherwise, it is retrieved from the
-            testing dataset. The index wraps around if it exceeds the dataset size.
+            Returns the total number of samples in the dataset.
+        __getitem__(idx: int):
+            Retrieves a single sample from the dataset based on the provided index.
     Args:
         data_path (str): The path where the CIFAR-10 dataset will be downloaded and stored.
                          Defaults to './data'.
+        train (bool): A flag indicating whether to load the training dataset (True)
+                      or the testing dataset (False). Defaults to False.
     Usage:
-        dataset = CIFAR10(data_path='./data')
-        print(len(dataset))  # Total number of samples in training and testing datasets
-        sample = dataset[0, train=True]  # Get the first sample from the training dataset
+        train_dataset = CIFAR10(data_path='./data', train=True)
+        print(len(train_dataset))  # Total number of samples in the training dataset
+        sample = train_dataset[0]  # Get the first sample from the training dataset
     """
 
-    def __init__(self, data_path: str = './data'):
-        self.train_data = datasets.CIFAR10(root=data_path, train=True, download=True, transform=transform)
-        self.test_data = datasets.CIFAR10(root=data_path, train=False, download=True, transform=transform)
+    def __init__(self, data_path: str = './data', train: bool = False):
+        self.data = datasets.CIFAR10(root=data_path, train=train, download=True, transform=transform)
 
     def __len__(self):
-        return len(self.train_data) + len(self.test_data)
+        return len(self.data)
 
-    def __getitem__(self, idx: int, train: bool):
-        if train:
-            idx = idx % len(self.train_data)
-            return self.train_data[idx]
-        else:
-            idx = idx % len(self.test_data)
-            return self.test_data[idx]
+    def __getitem__(self, idx: int):
+        return self.data[idx]
