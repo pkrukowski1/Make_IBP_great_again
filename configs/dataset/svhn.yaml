@@ -3,4 +3,5 @@ dataset:
   _target_: dataset.svhn
   data_path: ${oc.env:DATA_DIR}/svhn
   train: false
+  flatten: true
 batch_size: 1

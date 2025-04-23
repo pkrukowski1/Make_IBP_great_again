@@ -24,7 +24,7 @@ class AffineNN(MethodPluginABC):
         lr (float): Learning rate for the optimizer used in bounds optimization.
         lambda_reg (float): Regularization coefficient for stabilizing interval tightening.
     Methods:
-        __init__(optimize_bounds, gradient_iter=0, lr=0.1, lambda_reg=0.1):
+        __init__(epsilon, optimize_bounds, gradient_iter=0, lr=0.1, lambda_reg=0.1):
             Initializes the AffineNN object with the given parameters.
         get_bounds(x):
             Computes the affine arithmetic bounds for the input tensor `x` with perturbation `epsilon`.
@@ -55,7 +55,8 @@ class AffineNN(MethodPluginABC):
                 Interval: The computed interval bounds after the forward pass.
     """
 
-    def __init__(self, optimize_bounds: bool, 
+    def __init__(self, epsilon: float,
+                 optimize_bounds: bool, 
                  gradient_iter: int = 0,
                  lr: float = 0.1,
                  lambda_reg: float = 0.1,
@@ -63,6 +64,7 @@ class AffineNN(MethodPluginABC):
         
         super().__init__()
 
+        self.epsilon = epsilon
         self.optimize_bounds = optimize_bounds
 
         if optimize_bounds and gradient_iter == 0:

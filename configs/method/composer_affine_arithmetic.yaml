@@ -1,9 +1,9 @@
 _partial_: True
 _target_: method.Composer
-epsilon: 0.1
 
 plugins:
   - _target_: method.AffineNN
+    epsilon: 0.1
     optimize_bounds: True
     gradient_iter: 40
     lr: 0.1

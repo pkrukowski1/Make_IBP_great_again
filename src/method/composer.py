@@ -17,7 +17,6 @@ class Composer:
     module during the forward pass.
     Attributes:
         module (nn.Module): The neural network module to which plugins are applied.
-        epsilon (float): The interval radii.
         plugins (Optional[list[MethodPluginABC]]): A list of plugins that modify the behavior of the module. 
             Defaults to an empty list.
     Methods:
@@ -29,13 +28,11 @@ class Composer:
     """
     def __init__(self, 
         module: nn.Module,
-        epsilon: float,
         plugins: Optional[list[MethodPluginABC]]=[]
     ) -> None:
 
         self.module = module
         self.plugins = plugins
-        self.epsilon = epsilon
 
         for plugin in self.plugins:
             plugin.set_module(self.module)

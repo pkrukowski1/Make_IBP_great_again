@@ -1,9 +1,6 @@
 from torch.utils.data import Dataset
 from torchvision import datasets, transforms
 
-transform = transforms.Compose([
-    transforms.ToTensor(),
-])
 
 class CIFAR10(Dataset):
     """
@@ -14,7 +11,7 @@ class CIFAR10(Dataset):
     Attributes:
         data (torch.utils.data.Dataset): The CIFAR-10 dataset (either training or testing).
     Methods:
-        __init__(data_path: str = './data', train: bool = False):
+        __init__(data_path: str = './data', train: bool = False, flatten: bool = True):
             Initializes the CIFAR10 dataset wrapper by downloading and preparing
             either the training or testing dataset based on the `train` flag.
         __len__():
@@ -32,7 +29,11 @@ class CIFAR10(Dataset):
         sample = train_dataset[0]  # Get the first sample from the training dataset
     """
 
-    def __init__(self, data_path: str = './data', train: bool = False):
+    def __init__(self, data_path: str = './data', train: bool = False, flatten: bool = True):
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Lambda(lambda x: x.view(-1)) if flatten else lambda x: x
+        ])
         self.data = datasets.CIFAR10(root=data_path, train=train, download=True, transform=transform)
 
     def __len__(self):

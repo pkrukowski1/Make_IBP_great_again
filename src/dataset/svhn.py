@@ -1,9 +1,6 @@
 from torch.utils.data import Dataset
 from torchvision import datasets, transforms
 
-transform = transforms.Compose([
-    transforms.ToTensor(),
-])
 
 class SVHN(Dataset):
     """
@@ -11,7 +8,7 @@ class SVHN(Dataset):
     Attributes:
         data (torch.utils.data.Dataset): The dataset loaded from the SVHN dataset, either training or testing.
     Methods:
-        __init__(data_path: str = './data', train: bool = False):
+        __init__(data_path: str = './data', train: bool = False, flatten: bool = True):
             Initializes the SVHN dataset by downloading and preparing the specified split (train or test).
         __len__() -> int:
             Returns the total number of samples in the dataset.
@@ -22,7 +19,11 @@ class SVHN(Dataset):
         train (bool): Whether to load the training split. If False, loads the testing split. Defaults to False.
     """
 
-    def __init__(self, data_path: str= './data', train: bool = False):
+    def __init__(self, data_path: str= './data', train: bool = False, flatten: bool = True):
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Lambda(lambda x: x.view(-1)) if flatten else lambda x: x
+        ])
         _split = "train" if train else "test"
         self.data = datasets.SVHN(root=data_path, split=_split, download=True, transform=transform)
 

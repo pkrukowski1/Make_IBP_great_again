@@ -3,4 +3,5 @@ dataset:
   _target_: dataset.cifar10
   data_path: ${oc.env:DATA_DIR}/cifar10
   train: false
+  flatten: true
 batch_size: 1

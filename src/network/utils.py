@@ -19,7 +19,8 @@ def load_model(model: nn.Module, weight_path: str, device: str = "cpu") -> None:
     """
     state_dict = torch.load(weight_path, map_location=device)
     state_dict = state_dict.get("state_dict", state_dict)
+
     if isinstance(state_dict, list):
         state_dict = state_dict[0]
-        state_dict = {f"linears.{int(key.split('.')[0])-1}.{key.split('.')[1]}": val for key, val in state_dict.items()}
-    model.load_state_dict(state_dict, strict=False)
+    state_dict = {f"{int(key.split('.')[0])-1}.{key.split('.')[1]}": val for key, val in state_dict.items()}
+    model.load_state_dict(state_dict, strict=True)

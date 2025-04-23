@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 
-from typing import Tuple
+from typing import Tuple, List
 import logging
 
 from method.method_plugin_abc import MethodPluginABC
@@ -22,7 +22,7 @@ class IBP(MethodPluginABC):
         module (nn.Module): The neural network module through which intervals will be propagated.
         epsilon (torch.Tensor): The epsilon value used for interval propagation.
     Methods:
-        __init__() -> None:
+        __init__(epsilon: float) -> None:
             Initializes the IBP class with the given neural network module.
         forward(x: torch.Tensor, y: torch.Tensor) -> Interval:
             Performs interval bound propagation through the layers of the neural network.
@@ -35,37 +35,72 @@ class IBP(MethodPluginABC):
                 Interval: The propagated interval bounds.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, epsilon: float) -> None:
         super().__init__()
 
-        log.info(f"IBP plugin initialized for epsilon")
+        self.epsilon = epsilon
+        self._layer_handlers = {}
+        self._register_handlers()
+
+        log.info(f"IBP plugin initialized for epsilon={self.epsilon}")
     
+    def _register_handlers(self):
+        """
+        Register handlers for different layer types.
+        """
+        self._layer_handlers: List[Tuple[type, callable]] = [
+            (nn.Linear, lambda layer, x, epsilon: IntervalLinear(
+                layer.in_features, layer.out_features
+            ).forward(x, epsilon, weight=layer.weight, bias=layer.bias)),
+
+            (nn.ReLU, lambda layer, x, epsilon: IntervalReLU().forward(x, epsilon)),
+
+            (nn.Conv2d, lambda layer, x, epsilon: IntervalConv2d(
+                in_channels=layer.in_channels,
+                out_channels=layer.out_channels,
+                kernel_size=layer.kernel_size,
+                stride=layer.stride,
+                padding=layer.padding,
+                dilation=layer.dilation,
+                groups=layer.groups,
+                padding_mode=layer.padding_mode
+            ).forward(x, epsilon, weight=layer.weight, bias=layer.bias)),
+
+            (nn.Flatten, lambda layer, x, epsilon: IntervalFlatten(
+                start_dim=layer.start_dim,
+                end_dim=layer.end_dim
+            ).forward(x, epsilon)),
+
+            ((nn.BatchNorm1d, nn.BatchNorm2d), lambda layer, x, epsilon: IntervalBatchNorm(
+                eps=layer.eps,
+                momentum=layer.momentum
+            ).forward(x, epsilon, layer.weight, layer.bias, layer.running_mean, layer.running_var, layer.training)),
+
+            (nn.MaxPool2d, lambda layer, x, epsilon: IntervalMaxPool2d(
+                kernel_size=layer.kernel_size,
+                stride=layer.stride,
+                padding=layer.padding,
+                dilation=layer.dilation
+            ).forward(x, epsilon)),
+
+            (nn.AvgPool2d, lambda layer, x, epsilon: IntervalAvgPool2d(
+                kernel_size=layer.kernel_size,
+                stride=layer.stride,
+                padding=layer.padding
+            ).forward(x, epsilon))
+        ]
+
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> Interval:
         epsilon = self.epsilon * torch.ones_like(x)
-        layer_handlers = {
-            nn.Linear: lambda layer, x, epsilon: layer.forward(x, epsilon, layer.weight, layer.bias),
-            nn.ReLU: lambda layer, x, epsilon: layer.forward(x, epsilon),
-            nn.Conv2d: lambda layer, x, epsilon: layer.forward(x, epsilon, layer.weight, layer.bias),
-            nn.Flatten: lambda layer, x, epsilon: layer.forward(x, epsilon),
-            (nn.BatchNorm2d, nn.BatchNorm1d): lambda layer, x, epsilon: layer.forward(
-                x, epsilon, layer.weight, layer.bias,
-                running_mean=layer.running_mean,
-                running_var=layer.running_var,
-                training=self.module.training
-            ),
-            nn.MaxPool2d: lambda layer, x, epsilon: layer.forward(x, epsilon),
-            nn.AvgPool2d: lambda layer, x, epsilon: layer.forward(x, epsilon),
-        }
 
-        for layer in self.module.children():
-            for layer_type, handler in layer_handlers.items():
-                if isinstance(layer, layer_type):
-                    x, epsilon = handler(layer, x, epsilon)
-                    break
-            else:
-                log.warning(f"Layer {layer.__class__.__name__} not supported for IBP.")
-        return Interval(x-epsilon, x+epsilon)
-
+        with torch.no_grad():
+            for m in self.module.module.children():
+                for layer in m:
+                    for layer_type, handler in self._layer_handlers:
+                        if isinstance(layer, layer_type):
+                            x, epsilon = handler(layer, x, epsilon)
+                            break
+        return Interval(x - epsilon, x + epsilon)
 class IntervalLinear:
     """
     A class that performs interval-based linear transformations for interval arithmetic.
@@ -94,7 +129,7 @@ class IntervalLinear:
                     eps: torch.Tensor,
                     weight: torch.Tensor,
                     bias: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
-        
+
         # Perform linear transformation
         new_mu = F.linear(
             input=mu,

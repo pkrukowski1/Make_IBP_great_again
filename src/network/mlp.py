@@ -77,8 +77,8 @@ class MLP(nn.Module):
         for i in range(last_layer_idx):
             modules.append(nn.Linear(layers[i], layers[i + 1]))
 
-            if i < last_layer_idx:
-                modules.append(activation_fnc())
+            if i < last_layer_idx-1:
+                modules.append(activation_fnc)
         return nn.Sequential(*modules)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -89,5 +89,5 @@ class MLP(nn.Module):
         Returns:
             torch.Tensor: The output tensor after passing through the model.
         """
-
+        
         return self.model(x)

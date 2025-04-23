@@ -37,8 +37,5 @@ def run(config: DictConfig):
         X = fabric.to_device(X)
         y = fabric.to_device(y)
 
-        print(X.shape)
-        print(y.shape)
-
-        output_bounds = method(X,y)
-        print(output_bounds)
+        output_bounds = method.forward(X,y)
+       
