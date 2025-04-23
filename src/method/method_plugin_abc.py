@@ -18,17 +18,15 @@ class MethodPluginABC(metaclass=ABCMeta):
         module (nn.Module):
             The neural network module associated with the plugin.
     """
-    def set_module(self, module: nn.Module, epsilon: float) -> None:
+    def set_module(self, module: nn.Module) -> None:
         """
         Set the module for the plugin.
         
         Args:
             module(nn.Module): The model to be set.
-            epsilon(float): Perturbation parameter.
         """
 
         self.module = module
-        self.epsilon = epsilon
 
     @abstractmethod
     def forward(self, x, y) -> None:

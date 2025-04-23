@@ -1,5 +1,6 @@
 _partial_: True
 _target_: method.Composer
+epsilon: 0.01
+
 plugins:
   - _target_: method.IBP
-  - epsilon: 0.01

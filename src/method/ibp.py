@@ -19,11 +19,10 @@ class IBP(MethodPluginABC):
     through a given neural network module. It supports a variety of common layer types 
     and applies specific interval propagation logic for each supported layer.
     Attributes:
-        module (nn.Module): The neural network module through which interval propagation 
-            will be performed.
-        epsilon (float): The interval radii.
+        module (nn.Module): The neural network module through which intervals will be propagated.
+        epsilon (torch.Tensor): The epsilon value used for interval propagation.
     Methods:
-        __init__(module: nn.Module):
+        __init__() -> None:
             Initializes the IBP class with the given neural network module.
         forward(x: torch.Tensor, y: torch.Tensor) -> Interval:
             Performs interval bound propagation through the layers of the neural network.
@@ -36,13 +35,10 @@ class IBP(MethodPluginABC):
                 Interval: The propagated interval bounds.
     """
 
-    def __init__(self, module: nn.Module, epsilon: float) -> None:
+    def __init__(self) -> None:
         super().__init__()
 
-        self.module = module
-        self.epsilon = epsilon
-
-        log.info(f"IBP plugin initialized for module {self.module.__class__.__name__}")
+        log.info(f"IBP plugin initialized for epsilon")
     
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> Interval:
         epsilon = self.epsilon * torch.ones_like(x)

@@ -18,14 +18,13 @@ class AffineNN(MethodPluginABC):
     on neural networks. It supports interval tightening through learnable ReLU parameters 
     and gradient-based optimization.
     Attributes:
-        module (nn.Module): The neural network module to analyze.
         epsilon (float): The interval radii.
         optimize_bounds (bool): Flag indicating whether to optimize bounds using gradient-based methods.
         gradient_iter (int): Number of gradient iterations for optimizing bounds (required if optimize_bounds is True).
         lr (float): Learning rate for the optimizer used in bounds optimization.
         lambda_reg (float): Regularization coefficient for stabilizing interval tightening.
     Methods:
-        __init__(module, optimize_bounds, gradient_iter=0, lr=0.1, lambda_reg=0.1):
+        __init__(optimize_bounds, gradient_iter=0, lr=0.1, lambda_reg=0.1):
             Initializes the AffineNN object with the given parameters.
         get_bounds(x):
             Computes the affine arithmetic bounds for the input tensor `x` with perturbation `epsilon`.
@@ -56,9 +55,7 @@ class AffineNN(MethodPluginABC):
                 Interval: The computed interval bounds after the forward pass.
     """
 
-    def __init__(self, module: nn.Module,
-                 epsilon: float,
-                 optimize_bounds: bool, 
+    def __init__(self, optimize_bounds: bool, 
                  gradient_iter: int = 0,
                  lr: float = 0.1,
                  lambda_reg: float = 0.1,
@@ -66,8 +63,6 @@ class AffineNN(MethodPluginABC):
         
         super().__init__()
 
-        self.module = module
-        self.epsilon = epsilon
         self.optimize_bounds = optimize_bounds
 
         if optimize_bounds and gradient_iter == 0:
@@ -179,7 +174,7 @@ class AffineNN(MethodPluginABC):
         total_loss.backward()
         self.optimizer.step()
     
-    def forward(self, x, y):
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> Interval:
         """
         Performs the forward pass for affine arithmetic calculations.
         Args:

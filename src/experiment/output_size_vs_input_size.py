@@ -1,38 +1,44 @@
-import torch
+import logging
+from copy import deepcopy
+import numpy as np
+
 from omegaconf import DictConfig
 from hydra.utils import instantiate
 
-import utils
+import torch
+from torch.utils.data import DataLoader
 
-import logging
+import wandb
+from tqdm import tqdm
+
+from utils.fabric import setup_fabric
+from src.method.composer import Composer
+
 log = logging.getLogger(__name__)
-
-def get_fabric(config):
-    fabric = instantiate(config.fabric)
-    fabric.seed_everything(config.exp.seed)
-    fabric.launch()
-    return fabric
-
-def get_components(config, fabric):
-    network = fabric.setup(instantiate(config.network))
-    return network
+log.setLevel(logging.INFO)
 
 def get_dataloader(config, fabric):
     return fabric.setup_dataloaders(instantiate(config.dataset))
 
 def run(config: DictConfig):
-    utils.preprocess_config(config)
-    utils.setup_wandb(config)
-
     log.info(f'Launching Fabric')
-    fabric = get_fabric(config)
+    fabric = setup_fabric(config)
 
-    log.info(f'Building components')
-    network = get_components(config, fabric)
+    log.info(f'Building model')
+    model = fabric.setup(instantiate(config.network))
 
-    log.info(f'Initializing dataloader')
+    log.info(f'Setting up method')
+    method = instantiate(config.method)(model)
+
+    log.info(f'Setting up dataloaders')
     dataloader = get_dataloader(config, fabric)
 
-    with fabric.init_tensor():
-        for batch_idx, batch in enumerate(dataloader):
-            network.action()
+    for batch_idx, (X,y) in enumerate(dataloader):
+        X = fabric.to_device(X)
+        y = fabric.to_device(y)
+
+        print(X.shape)
+        print(y.shape)
+
+        output_bounds = method(X,y)
+        print(output_bounds)
