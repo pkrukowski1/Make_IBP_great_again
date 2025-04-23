@@ -18,13 +18,14 @@ class AffineNN(MethodPluginABC):
     on neural networks. It supports interval tightening through learnable ReLU parameters 
     and gradient-based optimization.
     Attributes:
+        module (nn.Module): The neural network module to analyze.
         epsilon (float): The interval radii.
         optimize_bounds (bool): Flag indicating whether to optimize bounds using gradient-based methods.
         gradient_iter (int): Number of gradient iterations for optimizing bounds (required if optimize_bounds is True).
         lr (float): Learning rate for the optimizer used in bounds optimization.
         lambda_reg (float): Regularization coefficient for stabilizing interval tightening.
     Methods:
-        __init__(epsilon, optimize_bounds, gradient_iter=0, lr=0.1, lambda_reg=0.1):
+        __init__(optimize_bounds, gradient_iter=0, lr=0.1, lambda_reg=0.1):
             Initializes the AffineNN object with the given parameters.
         get_bounds(x):
             Computes the affine arithmetic bounds for the input tensor `x` with perturbation `epsilon`.
@@ -69,17 +70,14 @@ class AffineNN(MethodPluginABC):
 
         if optimize_bounds and gradient_iter == 0:
             raise ValueError("Gradient iteration must be greater than 0 when optimize_bounds is True.")
+        
         self.gradient_iter = gradient_iter
         self.lambda_reg = lambda_reg
-
-        # Learnable ReLU parameters for tightening intervals
-        if optimize_bounds:
-            self.slope_relu_params = nn.ParameterList()
-            self.optimizer = torch.optim.Adam([*self.slope_relu_params], lr=lr)
-            self.criterion = nn.CrossEntropyLoss()
+        self.lr = lr
 
         log.info(f"Initialized Affine Arithmetic object with optimize_bounds={optimize_bounds}")
 
+        
     def get_bounds(self, x: torch.Tensor) -> Interval:
         """
         Computes the bounds of an affine arithmetic expression through a neural network.
@@ -93,6 +91,9 @@ class AffineNN(MethodPluginABC):
         Raises:
             NotImplementedError: If the network contains a layer type that is not supported.
         """
+        # WARNING: This method assumes that the input x is a single batch of data.
+        # If x is a batch, we need to squeeze it to get the first element.
+        x = x.squeeze(0)
         epsilon = self.epsilon * torch.ones_like(x)
         zl, zu = x - epsilon, x + epsilon
         expr = AffineExpr()
@@ -100,18 +101,19 @@ class AffineNN(MethodPluginABC):
         affine_func = expr.new_tensor(interval)
 
         relu_param_idx = 0  # Track which learnable ReLU param to use
-        
-        for layer in self.module:
-            if isinstance(layer, nn.Conv2d):
-                affine_func = affine_func.conv2d(layer)
-            elif isinstance(layer, nn.Linear):
-                affine_func = affine_func.linear(layer)
-            elif isinstance(layer, nn.ReLU):
-                slope = self.slope_relu_params[relu_param_idx]
-                affine_func = affine_func.relu(slope)
-                relu_param_idx += 1
-            else:
-                raise NotImplementedError(f"Layer type {type(layer)} not supported.")
+
+        for m in self.module.module.children():
+            for layer in m:
+                if isinstance(layer, nn.Conv2d):
+                    affine_func = affine_func.conv2d(layer)
+                elif isinstance(layer, nn.Linear):
+                    affine_func = affine_func.linear(layer)
+                elif isinstance(layer, nn.ReLU):
+                    slope = self.slope_relu_params[relu_param_idx]
+                    affine_func = affine_func.relu(slope)
+                    relu_param_idx += 1
+                else:
+                    raise NotImplementedError(f"Layer type {type(layer)} not supported.")
             
         return affine_func.to_interval()
     
@@ -133,16 +135,13 @@ class AffineNN(MethodPluginABC):
         # Minimize interval width
         loss_tight = torch.mean((z_U - z_L) ** 2)
 
-        # Ensure lower bound is non-negative
-        loss_nonneg = torch.mean(torch.clamp(-z_L, min=0))
-
         # Ensure lower bound <= upper bound
         loss_valid = torch.mean(torch.clamp(z_L - z_U, min=0))
 
         # Regularization for stability
         loss_reg = self.lambda_reg * (torch.norm(z_L) + torch.norm(z_U))
         
-        return loss_tight + 0.1 * loss_nonneg + 0.1 * loss_valid + loss_reg
+        return loss_tight + 0.1 * loss_valid + loss_reg
     
     def _gradient_step(self, x, y):
         """
@@ -159,8 +158,7 @@ class AffineNN(MethodPluginABC):
             total loss is computed as the sum of these two losses. The optimizer is
             then used to perform a gradient descent step to minimize the total loss.
         """
-        epsilon = self.epsilon * torch.ones_like(x)
-        outputs = self.get_bounds(x, epsilon)   
+        outputs = self.get_bounds(x)   
         loss = self.tighten_up_intervals(outputs.lower, outputs.upper)
         
         lb = outputs.lower.unsqueeze(0)
@@ -176,7 +174,7 @@ class AffineNN(MethodPluginABC):
         total_loss.backward()
         self.optimizer.step()
     
-    def forward(self, x: torch.Tensor, y: torch.Tensor) -> Interval:
+    def forward(self, x, y):
         """
         Performs the forward pass for affine arithmetic calculations.
         Args:
@@ -192,12 +190,24 @@ class AffineNN(MethodPluginABC):
               the input tensor and the epsilon tensor.
         """
 
-        epsilon = epsilon * torch.ones_like(x)
-
         if self.optimize_bounds:
+            self.slope_relu_params = nn.ParameterList()
+            for m in self.module.module.children():
+                for idx, layer in enumerate(m):
+                    if isinstance(layer, nn.ReLU):
+                        prev_layer = m[idx-1]
+                        if isinstance(prev_layer, nn.Conv2d):
+                            slope = torch.nn.Parameter(torch.ones(prev_layer.out_channels))
+                        elif isinstance(prev_layer, nn.Linear):
+                            slope = torch.nn.Parameter(torch.ones(prev_layer.out_features))
+                        self.slope_relu_params.append(slope)
+            
+            self.optimizer = torch.optim.Adam([*self.slope_relu_params], lr=self.lr)
+            self.criterion = nn.CrossEntropyLoss()
+
             for _ in range(self.gradient_iter):            
-                self._gradient_step(x, epsilon, y)
-        outputs = self.get_bounds(x, epsilon)
+                self._gradient_step(x, y)
+        outputs = self.get_bounds(x)
            
         return outputs
 

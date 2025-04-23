@@ -33,8 +33,8 @@ class Composer:
 
         self.module = module
         self.plugins = plugins
-
         for plugin in self.plugins:
+            
             plugin.set_module(self.module)
             log.info(f'Plugin {plugin.__class__.__name__} added to composer')
 
