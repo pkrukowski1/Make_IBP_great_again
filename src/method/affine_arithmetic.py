@@ -24,6 +24,7 @@ class AffineNN(MethodPluginABC):
         gradient_iter (int): Number of gradient iterations for optimizing bounds (required if optimize_bounds is True).
         lr (float): Learning rate for the optimizer used in bounds optimization.
         lambda_reg (float): Regularization coefficient for stabilizing interval tightening.
+        lambda_valid (float): Coefficient for ensuring that upper bound is greater than lower bound.
     Methods:
         __init__(optimize_bounds, gradient_iter=0, lr=0.1, lambda_reg=0.1):
             Initializes the AffineNN object with the given parameters.
@@ -61,6 +62,7 @@ class AffineNN(MethodPluginABC):
                  gradient_iter: int = 0,
                  lr: float = 0.1,
                  lambda_reg: float = 0.1,
+                 lambda_valid: float = 0.1
                  ):
         
         super().__init__()
@@ -73,6 +75,7 @@ class AffineNN(MethodPluginABC):
         
         self.gradient_iter = gradient_iter
         self.lambda_reg = lambda_reg
+        self.lambda_valid = lambda_valid
         self.lr = lr
 
         log.info(f"Initialized Affine Arithmetic object with optimize_bounds={optimize_bounds}")
@@ -136,12 +139,12 @@ class AffineNN(MethodPluginABC):
         loss_tight = torch.mean((z_U - z_L) ** 2)
 
         # Ensure lower bound <= upper bound
-        loss_valid = torch.mean(torch.clamp(z_L - z_U, min=0))
+        loss_valid = self.lambda_valid * torch.mean(torch.clamp(z_L - z_U, min=0))
 
         # Regularization for stability
         loss_reg = self.lambda_reg * (torch.norm(z_L) + torch.norm(z_U))
         
-        return loss_tight + 0.1 * loss_valid + loss_reg
+        return loss_tight + loss_valid + loss_reg
     
     def _gradient_step(self, x, y):
         """

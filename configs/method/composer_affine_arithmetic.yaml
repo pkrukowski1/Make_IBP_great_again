@@ -8,3 +8,4 @@ plugins:
     gradient_iter: 100
     lr: 0.1
     lambda_reg: 0.1
+    lambda_valid: 0.1
