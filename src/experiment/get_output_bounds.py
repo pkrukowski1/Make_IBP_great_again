@@ -57,6 +57,7 @@ def verify_point(output_bounds: Interval, label: torch.Tensor) -> float:
         upper_bound = squeeze_batch_dim(upper_bound)
         verified = 0.0
 
+        # TODO FIx 
         if y_pred == label:
             lower_bound_gt = lower_bound[y_pred]
             upper_bound_non_gt = upper_bound[torch.arange(upper_bound.size(0)) != y_pred]
