@@ -8,7 +8,7 @@ This paper demonstrates that IBP is sub-optimal in the first case due to its sus
 ## Teaser
 The Affine Arithmetic (AA) method is able to reduce the wrapping effect compared to the Interval Bound Propagation (IBP) method.
 
-![Working scheme of the AA and IBP methods](./teaser.png)
+![Working scheme of the AA and IBP methods](./imgs/teaser.png)
 
 ## Datasets
 For the experiments and ablation study, we use 4 publicly available datasets:
