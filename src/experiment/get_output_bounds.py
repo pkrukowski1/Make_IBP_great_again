@@ -4,6 +4,7 @@ import time
 import torch
 import wandb
 import torch.nn.functional as F
+import json
 
 from omegaconf import DictConfig
 from hydra.utils import instantiate
@@ -28,7 +29,6 @@ def get_dataloader(config: DictConfig, fabric) -> torch.utils.data.DataLoader:
     Returns:
         DataLoader: A dataloader instance prepared using the specified configuration and fabric.
     """
-
     return fabric.setup_dataloaders(instantiate(config.dataset))
 
 def verify_point(output_bounds: Interval, label: torch.Tensor) -> float:
@@ -44,7 +44,6 @@ def verify_point(output_bounds: Interval, label: torch.Tensor) -> float:
     Returns:
         float: A verification result where 1.0 indicates that the point is verified.
     """
-
     with torch.no_grad():
         logits = output_bounds.midpoint()
         preds = F.softmax(logits, dim=-1)
@@ -83,10 +82,11 @@ def run(config: DictConfig):
     dataloader = get_dataloader(config, fabric)
 
     extracted_output_dir = extract_output_dir(config)
-    output_file = f"{extracted_output_dir}/output_bounds.txt"
+    output_file = f"{extracted_output_dir}/output_bounds.json"
     
     processing_times = []
     verified_points = []
+    batch_results = []
     
     for batch_idx, (X, y) in enumerate(tqdm(dataloader, desc="Processing batches")):
         X = fabric.to_device(X)
@@ -120,28 +120,36 @@ def run(config: DictConfig):
             "batch_size": batch_size
         })
         
-        # Save to file
-        with open(output_file, 'a') as f:
-            f.write(f"Batch {batch_idx}:\n")
-            f.write(f"Output Bounds Length: {output_bounds_length}\n")
-            f.write(f"Verified Point: {verified}\n")
-            f.write(f"Avg Time per Image: {avg_time_per_image:.6f} seconds\n")
-            f.write("-" * 50 + "\n")
+        # Collect batch metrics
+        batch_results.append({
+            "batch_idx": batch_idx,
+            "output_bounds_length": output_bounds_length,
+            "verified_point": verified,
+            "avg_time_per_image": avg_time_per_image
+        })
             
-    # Calculate and log overall metrics
+    # Calculate overall metrics
     overall_avg_time = np.mean(processing_times)
     overall_verified_points = np.mean(verified_points)
     wandb.log({
         "overall_avg_processing_time_per_image": overall_avg_time,
         "overall_verified_points": overall_verified_points
-        })
+    })
     
-    # Save overall statistics
-    with open(output_file, 'a') as f:
-        f.write(f"Overall Statistics:\n")
-        f.write(f"Average Processing Time per Image: {overall_avg_time:.6f} seconds\n")
-        f.write(f"Overall Verified Points [%]: {100*overall_verified_points:.2f}%\n")
-        f.write(f"Total Batches Processed: {batch_idx + 1}\n")
+    # Prepare overall statistics
+    overall_stats = {
+        "overall_avg_processing_time_per_image": overall_avg_time,
+        "overall_verified_points_percent": 100 * overall_verified_points,
+        "total_batches_processed": batch_idx + 1
+    }
+    
+    # Save to JSON file
+    output_data = {
+        "batches": batch_results,
+        "overall_statistics": overall_stats
+    }
+    with open(output_file, 'w') as f:
+        json.dump(output_data, f, indent=4)
     
     # Finish wandb run
     wandb.finish()
