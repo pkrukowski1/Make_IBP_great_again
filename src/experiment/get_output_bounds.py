@@ -15,7 +15,20 @@ from method.interval_arithmetic import Interval
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-def get_dataloader(config, fabric):
+def squeeze_batch_dim(tensor: torch.Tensor) -> torch.Tensor:
+    """Squeeze batch dimension if batch size is 1, else return unchanged."""
+    return tensor.squeeze(0) if tensor.size(0) == 1 else tensor
+
+def get_dataloader(config: DictConfig, fabric) -> torch.utils.data.DataLoader:
+    """
+    Initializes and returns a dataloader using the provided configuration and fabric.
+    Args:
+        config (dict): A configuration object containing the dataset settings.
+        fabric (object): An object responsible for setting up dataloaders.
+    Returns:
+        DataLoader: A dataloader instance prepared using the specified configuration and fabric.
+    """
+
     return fabric.setup_dataloaders(instantiate(config.dataset))
 
 def verify_point(output_bounds: Interval, label: torch.Tensor) -> float:
@@ -37,15 +50,20 @@ def verify_point(output_bounds: Interval, label: torch.Tensor) -> float:
         preds = F.softmax(logits, dim=-1)
         y_pred = torch.argmax(preds, dim=-1)
 
+        lower_bound = output_bounds.lower
+        upper_bound = output_bounds.upper
+
+        lower_bound = squeeze_batch_dim(lower_bound)
+        upper_bound = squeeze_batch_dim(upper_bound)
         verified = 0.0
 
         if y_pred == label:
-            lower_bound_gt = output_bounds.lower[:,y_pred]
-            upper_bound_non_gt = output_bounds.upper[:,torch.arange(output_bounds.upper.size(1)) != y_pred]
+            lower_bound_gt = lower_bound[y_pred]
+            upper_bound_non_gt = upper_bound[torch.arange(upper_bound.size(0)) != y_pred]
             if (lower_bound_gt > upper_bound_non_gt).all():
                 verified = 1.0
 
-    return verified
+        return verified
 
 def run(config: DictConfig):
     # Initialize wandb
@@ -86,7 +104,7 @@ def run(config: DictConfig):
         # Convert output_bounds to numpy for logging/saving
         lb = int_output_bounds.lower
         ub = int_output_bounds.upper
-
+        
         # Calculate metrics
         output_bounds_length = torch.max(ub - lb, dim=-1).values.item()
         verified_points.append(verify_point(int_output_bounds, y))
@@ -107,7 +125,7 @@ def run(config: DictConfig):
             f.write(f"Verified Point: {verified_points[-1]}\n")
             f.write(f"Avg Time per Image: {avg_time_per_image:.6f} seconds\n")
             f.write("-" * 50 + "\n")
-    
+            
     # Calculate and log overall metrics
     overall_avg_time = np.mean(processing_times)
     overall_verified_points = np.mean(verified_points)
@@ -120,7 +138,7 @@ def run(config: DictConfig):
     with open(output_file, 'a') as f:
         f.write(f"Overall Statistics:\n")
         f.write(f"Average Processing Time per Image: {overall_avg_time:.6f} seconds\n")
-        f.write(f"Overall Verified Points: {overall_verified_points:.2f}\n")
+        f.write(f"Overall Verified Points [%]: {100*overall_verified_points:.2f}%\n")
         f.write(f"Total Batches Processed: {batch_idx + 1}\n")
     
     # Finish wandb run

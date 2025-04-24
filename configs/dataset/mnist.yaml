@@ -4,4 +4,5 @@ dataset:
   data_path: ${oc.env:DATA_DIR}/mnist
   train: false
   flatten: true
+  no_points: 1000
 batch_size: 1
