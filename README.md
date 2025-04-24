@@ -1,4 +1,5 @@
 # Make Interval Bound Propagation great again
+<p align="right"><img style="float: right;" src="./imgs/gmum.png" alt="logo" width="100"/></p>
 
 ## Abstract
 In various scenarios motivated by real life, such as medical data analysis, autonomous driving, and adversarial training, we are interested in robust deep networks. A network is robust when a relatively small perturbation of the input cannot lead to drastic changes in output (like change of class, etc.). This falls under the broader scope field of Neural Network Certification (NNC).
