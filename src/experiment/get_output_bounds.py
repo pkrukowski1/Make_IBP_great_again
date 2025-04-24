@@ -55,10 +55,10 @@ def verify_point(output_bounds: Interval, label: torch.Tensor) -> float:
 
         lower_bound = squeeze_batch_dim(lower_bound)
         upper_bound = squeeze_batch_dim(upper_bound)
-        verified = 0.0
+        verified = None
 
-        # TODO FIx 
         if y_pred == label:
+            verified = 0.0
             lower_bound_gt = lower_bound[y_pred]
             upper_bound_non_gt = upper_bound[torch.arange(upper_bound.size(0)) != y_pred]
             if (lower_bound_gt > upper_bound_non_gt).all():
@@ -108,14 +108,15 @@ def run(config: DictConfig):
         
         # Calculate metrics
         output_bounds_length = torch.max(ub - lb, dim=-1).values.item()
-        verified_points.append(verify_point(int_output_bounds, y))
+        verified = verify_point(int_output_bounds, y)
+        verified_points.extend([] if verified is None else [verified])
         
         # Log to wandb
         wandb.log({
             "batch_idx": batch_idx,
             "output_bounds_length": output_bounds_length,
             "avg_processing_time_per_image": avg_time_per_image,
-            "correctly_verified_point": verified_points[-1],
+            "correctly_verified_point": verified,
             "batch_size": batch_size
         })
         
@@ -123,7 +124,7 @@ def run(config: DictConfig):
         with open(output_file, 'a') as f:
             f.write(f"Batch {batch_idx}:\n")
             f.write(f"Output Bounds Length: {output_bounds_length}\n")
-            f.write(f"Verified Point: {verified_points[-1]}\n")
+            f.write(f"Verified Point: {verified}\n")
             f.write(f"Avg Time per Image: {avg_time_per_image:.6f} seconds\n")
             f.write("-" * 50 + "\n")
             
