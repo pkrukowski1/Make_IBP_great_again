@@ -28,13 +28,8 @@ method:
   _partial_: True
   _target_: method.Composer
   plugins:
-    - _target_: method.AffineNN
+    - _target_: method.IBP
       epsilon: 0.026
-      optimize_bounds: True
-      gradient_iter: 100
-      lr: 0.1
-      lambda_reg: 0.1
-      lambda_valid: 0.1
 
 dataset:
   _target_: torch.utils.data.DataLoader
