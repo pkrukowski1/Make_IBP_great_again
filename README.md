@@ -1,5 +1,4 @@
 # Make Interval Bound Propagation great again
-<p align="right"><img style="float: right;" src="./imgs/gmum.png" alt="logo" width="100"/></p>
 
 ## Abstract
 In various scenarios motivated by real life, such as medical data analysis, autonomous driving, and adversarial training, we are interested in robust deep networks. A network is robust when a relatively small perturbation of the input cannot lead to drastic changes in output (like change of class, etc.). This falls under the broader scope field of Neural Network Certification (NNC).
@@ -38,5 +37,5 @@ WANDB_MODE={offline/online} HYDRA_FULL_ERROR={0/1} python src/main.py --config-n
 
 ## Acknowledgements
 - Project Structure based on [template](https://github.com/sobieskibj/templates/tree/master) by Bartłomiej Sobieski
-- Implementation of Affine Arithmetic was originally developed by [Daniel Wilczak](https://ww2.ii.uj.edu.pl/~wilczak/) in C++ using [CAP](https://github.com/CAPDGroup/CAPD) library.
+- Implementation of Affine Arithmetic was originally developed by [Daniel Wilczak](https://ww2.ii.uj.edu.pl/~wilczak/) in C++ using [CAPD](https://github.com/CAPDGroup/CAPD) library.
 - The implementation of Affine Arithmetic was later converted to Python by [Piotr Borycki](https://github.com/piotr310100).
