@@ -37,3 +37,5 @@ WANDB_MODE={offline/online} HYDRA_FULL_ERROR={0/1} python src/main.py --config-n
 
 ## Acknowledgements
 - Project Structure based on [template](https://github.com/sobieskibj/templates/tree/master) by Bartłomiej Sobieski
+- Implementation of Affine Arithmetic was originally developed by [Daniel Wilczak](https://ww2.ii.uj.edu.pl/~wilczak/) in C++ using [CAP](https://github.com/CAPDGroup/CAPD) library.
+- The implementation of Affine Arithmetic was later converted to Python by [Piotr Borycki](https://github.com/piotr310100).
