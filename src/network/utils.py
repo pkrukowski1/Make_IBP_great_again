@@ -72,8 +72,8 @@ def load_conv_model(model: nn.Module, weight_path: str, device: str = "cpu") -> 
             else:
                 print(f"Key {new_key} (from {key}) not found in model state_dict")
 
-    print(f"Adjusted state_dict keys: {list(adjusted_state_dict.keys())}")
-    print(f"Model state_dict keys: {list(model_state_dict.keys())}")
+    # print(f"Adjusted state_dict keys: {list(adjusted_state_dict.keys())}")
+    # print(f"Model state_dict keys: {list(model_state_dict.keys())}")
 
     if not adjusted_state_dict:
         raise RuntimeError("No matching keys found in adjusted state_dict. Cannot load weights.")
