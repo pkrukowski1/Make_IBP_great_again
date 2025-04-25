@@ -1,5 +1,6 @@
 import numpy as torch
 import logging
+import math
 
 from method.interval_arithmetic import Interval, interval_hull, intersection
 from method.method_plugin_abc import MethodPluginABC
@@ -116,8 +117,8 @@ class AffineNN(MethodPluginABC):
                         slope = self.slope_relu_params[relu_param_idx]
                         affine_func = affine_func.relu(slope)
                         relu_param_idx += 1
-                else:
-                    raise NotImplementedError(f"Layer type {type(layer)} not supported.")
+                elif isinstance(layer, nn.Flatten):
+                    affine_func = affine_func.flatten()
             
         return affine_func.to_interval()
     
@@ -201,7 +202,8 @@ class AffineNN(MethodPluginABC):
                     if isinstance(layer, nn.ReLU):
                         prev_layer = m[idx-1]
                         if isinstance(prev_layer, nn.Conv2d):
-                            slope = nn.Parameter(torch.log(0.5*torch.ones(prev_layer.out_channels)), requires_grad=True)
+                            out_shape = self.module.layer_outputs.get(prev_layer)
+                            slope = nn.Parameter(torch.log(0.5*torch.ones(out_shape)), requires_grad=True)
                         elif isinstance(prev_layer, nn.Linear):
                             slope = nn.Parameter(torch.log(0.5*torch.ones(prev_layer.out_features)), requires_grad=True)
                         self.slope_relu_params.append(slope)
@@ -442,25 +444,33 @@ class AffineFunc:
         kernel_size = conv_layer.kernel_size
         stride = conv_layer.stride
         kernel = conv_layer.weight
+
         x = self.coeffs.permute(3, 0, 1, 2)
         x = F.unfold(x, kernel_size=kernel_size, padding=padding, stride=stride).permute(2, 1, 0)
         x = torch.einsum("pba,cb->cpa", x, kernel.view(kernel.size(0), -1))
-        x = x.reshape(x.size(0), H, W, a)
+
+        space_dim = int(math.sqrt(x.size(1)))
+        x = x.reshape(x.size(0), space_dim, space_dim, a)
         if conv_layer.bias is not None:
             x = x + conv_layer.bias.view(-1, 1, 1, 1)
-
+        
         return AffineFunc(c=x, expr=self.expr)
 
     def linear(self, linear_layer: nn.Linear):
         A = linear_layer.weight
         b = linear_layer.bias
-
+        
         x = self.coeffs
         x = torch.einsum("ea,oe->oa", x, A)
         
         if b is not None:
             x[..., 0] += b.view(*([1] * (x.dim() - 2)), -1)
             
+        return AffineFunc(c=x, expr=self.expr)
+    
+    def flatten(self):
+        x = self.coeffs
+        x = x.flatten(start_dim=0, end_dim=-2)
         return AffineFunc(c=x, expr=self.expr)
 
 class AffineExpr:
