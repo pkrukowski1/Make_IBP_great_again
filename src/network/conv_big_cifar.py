@@ -8,9 +8,9 @@ from .utils import load_conv_model
 log = logging.getLogger(__name__)
 
 
-class ConvBigMNIST(nn.Module):
+class ConvBigCIFAR(nn.Module):
     """
-    ConvBigMNIST: A convolutional neural network model for feature extraction and classification.
+    ConvBigCIFAR: A convolutional neural network model for feature extraction and classification.
     This class defines a convolutional neural network with multiple convolutional layers 
     for feature extraction, followed by fully connected layers for classification. The 
     model can optionally load pre-trained weights from a specified file path.
@@ -21,7 +21,7 @@ class ConvBigMNIST(nn.Module):
             weights will be loaded from this file.
     Methods:
         __init__(dim_out: int, model_path: str = None):
-            Initializes the ConvBigMNIST model with the specified input channels, output dimensions, 
+            Initializes the ConvBigCIFAR model with the specified input channels, output dimensions, 
             and an optional path to a pre-trained model.
         _build() -> nn.Sequential:
             Constructs the feature extractor and classifier components of the model. Dynamically 
@@ -45,9 +45,9 @@ class ConvBigMNIST(nn.Module):
         """
         super().__init__()
 
-        self.in_channels = 1
-        self.input_height = 28
-        self.input_width = 28
+        self.in_channels = 3
+        self.input_height = 32
+        self.input_width = 32
         self.dim_out = dim_out
 
         self.model = self._build()
