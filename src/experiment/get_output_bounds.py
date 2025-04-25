@@ -95,7 +95,7 @@ def run(config: DictConfig):
         start_time = time.time()
         
         int_output_bounds = method.forward(X, y)
-        print(f"Batch {batch_idx}, Output Bounds: {int_output_bounds}")
+        log.info(f"Batch {batch_idx+1}, Output Bounds: {int_output_bounds}")
         
         # Calculate processing time
         batch_time = time.time() - start_time
