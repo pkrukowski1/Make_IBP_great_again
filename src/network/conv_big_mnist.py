@@ -51,6 +51,12 @@ class ConvBigMNIST(nn.Module):
         self.dim_out = dim_out
 
         self.model = self._build()
+        self.layer_outputs = {}
+
+        self.model.apply(self.register_hooks)
+        with torch.no_grad():
+            dummy_input = torch.zeros(1, self.in_channels, self.input_height, self.input_width)  # Just once, at model level
+            self.model(dummy_input)
         
         if model_path is not None:
             load_conv_model(self.model, model_path)
@@ -100,6 +106,12 @@ class ConvBigMNIST(nn.Module):
         all_layers = feature_layers + classifier
 
         return nn.Sequential(*all_layers)
+    
+    def register_hooks(self, m):
+        def hook_fn(module, input, output):
+            self.layer_outputs[module] = output.shape[1:]  # Exclude batch dim
+        if isinstance(m, (nn.Conv2d, nn.Linear)):
+            m.register_forward_hook(hook_fn)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

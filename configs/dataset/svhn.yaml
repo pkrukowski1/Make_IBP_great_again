@@ -1,6 +1,6 @@
 _target_: torch.utils.data.DataLoader
 dataset:
-  _target_: dataset.svhn
+  _target_: dataset.SVHN
   data_path: ${oc.env:DATA_DIR}/svhn
   train: false
   flatten: true
