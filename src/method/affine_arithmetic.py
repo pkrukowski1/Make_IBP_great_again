@@ -452,8 +452,8 @@ class AffineFunc:
         space_dim = int(math.sqrt(x.size(1)))
         x = x.reshape(x.size(0), space_dim, space_dim, a)
         if conv_layer.bias is not None:
-            x = x + conv_layer.bias.view(-1, 1, 1, 1)
-        
+            x[..., 0] += conv_layer.bias.view(-1, *([1] * (x.dim() - 2)))
+
         return AffineFunc(c=x, expr=self.expr)
 
     def linear(self, linear_layer: nn.Linear):
