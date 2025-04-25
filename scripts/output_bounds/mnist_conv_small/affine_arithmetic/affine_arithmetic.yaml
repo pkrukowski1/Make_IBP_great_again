@@ -1,0 +1,46 @@
+defaults:
+  - _self_
+
+exp:
+  seed: 1
+  log_dir: # set during runtime to automatically created dir
+  run_func: 
+    _target_: experiment.run_get_output_bounds
+
+fabric:
+  _target_: lightning.Fabric
+  num_nodes: 1
+  devices: 1
+  accelerator: cpu # or gpu
+
+wandb:
+  entity: ${oc.env:WANDB_ENTITY}
+  project: ${oc.env:WANDB_PROJECT}
+
+network:
+  _target_: network.ConvSmallMNIST
+  dim_out: 10
+  model_path: ${oc.env:MODEL_DIR}/mnist_conv_small_nat.pth
+
+method:
+  _partial_: True
+  _target_: method.Composer
+  plugins:
+    - _target_: method.AffineNN
+      epsilon: 0.12
+      optimize_bounds: True
+      gradient_iter: 100
+      lr: 0.1
+      lambda_reg: 0.1
+      lambda_valid: 0.1
+
+dataset:
+  _target_: torch.utils.data.DataLoader
+  dataset:
+    _target_: dataset.MNIST
+    data_path: ${oc.env:DATA_DIR}/mnist
+    train: false
+    flatten: false
+    no_points: 1000
+  batch_size: 1
+
