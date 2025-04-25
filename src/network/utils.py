@@ -67,11 +67,13 @@ def load_conv_model(model: nn.Module, weight_path: str, device: str = "cpu") -> 
         else:
             for model_key in model_state_dict:
                 if model_key.endswith(parts[-1]) and model_state_dict[model_key].shape == val.shape:
-                    print(f"Mapping {key} to {model_key} based on partial match")
                     adjusted_state_dict[model_key] = val
                     break
             else:
                 print(f"Key {new_key} (from {key}) not found in model state_dict")
+
+    print(f"Adjusted state_dict keys: {list(adjusted_state_dict.keys())}")
+    print(f"Model state_dict keys: {list(model_state_dict.keys())}")
 
     if not adjusted_state_dict:
         raise RuntimeError("No matching keys found in adjusted state_dict. Cannot load weights.")

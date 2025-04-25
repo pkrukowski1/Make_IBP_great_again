@@ -48,30 +48,31 @@ class ConvSmallMNIST(nn.Module):
 
     def _build(self) -> nn.Sequential:
         """
-        Builds the architecture of the ConvSmall model, including the feature extractor and classifier.
+        Builds the architecture of the ConvSmall model as a single flat nn.Sequential.
         Returns:
-            nn.Sequential: A sequential container of the feature extractor and classifier.
+            nn.Sequential: A flat sequential model including feature extractor and classifier.
         """
-        feature_extractor = nn.Sequential(
-            nn.Conv2d(self.in_channels, 16, (4,4), 2),
+        feature_layers = [
+            nn.Conv2d(self.in_channels, 16, kernel_size=4, stride=2),
             nn.ReLU(),
-            nn.Conv2d(16, 32, (4,4), 2),
+            nn.Conv2d(16, 32, kernel_size=4, stride=2),
             nn.ReLU(),
             nn.Flatten(),
-        )
-
-        # Dynamically determine the number of features after flattening
+        ]
+        
         with torch.no_grad():
             dummy_input = torch.zeros(1, self.in_channels, self.input_height, self.input_width)
-            hidden_units = feature_extractor(dummy_input).shape[1]
+            hidden_units = nn.Sequential(*feature_layers)(dummy_input).shape[1]
 
-        classifier = nn.Sequential(
+        classifier_layers = [
             nn.Linear(hidden_units, 100),
             nn.ReLU(),
             nn.Linear(100, self.dim_out),
-        )
+        ]
 
-        return nn.Sequential(feature_extractor, classifier)
+        all_layers = feature_layers + classifier_layers
+
+        return nn.Sequential(*all_layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

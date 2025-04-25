@@ -72,32 +72,34 @@ class ConvBigMNIST(nn.Module):
               and output dimensions (self.dim_out) must be defined as attributes of the class.
         """
 
-        feature_extractor = nn.Sequential(
-            nn.Conv2d(self.in_channels, 32, kernel_size=3, stride=1, padding=1),
+        feature_layers = [
+            nn.Conv2d(self.in_channels, 32, kernel_size=3, stride=1, padding=1, bias=False),
             nn.ReLU(),
             nn.Conv2d(32, 32, kernel_size=4, stride=2, padding=1),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1, bias=False),
             nn.ReLU(),
             nn.Conv2d(64, 64, kernel_size=4, stride=2, padding=1),
             nn.ReLU(),
             nn.Flatten()
-        )
+        ]
 
         # Dynamically determine the number of features after flattening
         with torch.no_grad():
             dummy_input = torch.zeros(1, self.in_channels, self.input_height, self.input_width)
-            hidden_units = feature_extractor(dummy_input).shape[1]
+            hidden_units = nn.Sequential(*feature_layers)(dummy_input).shape[1]
 
-        classifier = nn.Sequential(
+        classifier = [
             nn.Linear(hidden_units, 512),
             nn.ReLU(),
-            nn.Linear(512, 512),
+            nn.Linear(512, 512, bias=False),
             nn.ReLU(),
             nn.Linear(512, self.dim_out)
-        )
+        ]
 
-        return nn.Sequential(feature_extractor, classifier)
+        all_layers = feature_layers + classifier
+
+        return nn.Sequential(*all_layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

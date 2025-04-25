@@ -1,4 +1,0 @@
-_target_: network.ConvSmall
-in_channels: 3
-dim_out: 10
-model_path: ${oc.env:MODEL_DIR}/cifar_conv_small_pgd.pth
