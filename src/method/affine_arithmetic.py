@@ -24,10 +24,9 @@ class AffineNN(MethodPluginABC):
         optimize_bounds (bool): Flag indicating whether to optimize bounds using gradient-based methods.
         gradient_iter (int): Number of gradient iterations for optimizing bounds (required if optimize_bounds is True).
         lr (float): Learning rate for the optimizer used in bounds optimization.
-        lambda_reg (float): Regularization coefficient for stabilizing interval tightening.
         lambda_valid (float): Coefficient for ensuring that upper bound is greater than lower bound.
     Methods:
-        __init__(optimize_bounds, gradient_iter=0, lr=0.1, lambda_reg=0.1):
+        __init__(optimize_bounds, gradient_iter=0, lr=0.1):
             Initializes the AffineNN object with the given parameters.
         get_bounds(x):
             Computes the affine arithmetic bounds for the input tensor `x` with perturbation `epsilon`.
@@ -62,7 +61,6 @@ class AffineNN(MethodPluginABC):
                  optimize_bounds: bool, 
                  gradient_iter: int = 0,
                  lr: float = 0.1,
-                 lambda_reg: float = 0.1,
                  lambda_valid: float = 0.1
                  ):
         
@@ -75,7 +73,6 @@ class AffineNN(MethodPluginABC):
             raise ValueError("Gradient iteration must be greater than 0 when optimize_bounds is True.")
         
         self.gradient_iter = gradient_iter
-        self.lambda_reg = lambda_reg
         self.lambda_valid = lambda_valid
         self.lr = lr
 
@@ -124,17 +121,14 @@ class AffineNN(MethodPluginABC):
     
     def tighten_up_intervals(self, z_L: torch.Tensor, z_U: torch.Tensor) -> torch.Tensor:
         """
-        Tightens up the intervals by minimizing their width, ensuring validity, 
-        and applying regularization for stability.
+        Tightens up the intervals by minimizing their width, ensuring validity.
         Args:
             z_L (torch.Tensor): The lower bounds of the intervals.
             z_U (torch.Tensor): The upper bounds of the intervals.
         Returns:
             torch.Tensor: The computed loss value, which is a combination of:
                 - Interval width minimization loss.
-                - Non-negativity constraint loss for the lower bounds.
                 - Validity constraint loss ensuring lower bounds are less than or equal to upper bounds.
-                - Regularization loss for stability.
         """
 
         # Minimize interval width
@@ -142,11 +136,8 @@ class AffineNN(MethodPluginABC):
 
         # Ensure lower bound <= upper bound
         loss_valid = self.lambda_valid * torch.mean(torch.clamp(z_L - z_U, min=0))
-
-        # Regularization for stability
-        loss_reg = self.lambda_reg * (torch.norm(z_L) + torch.norm(z_U))
         
-        return loss_tight + loss_valid + loss_reg
+        return loss_tight + loss_valid
     
     def _gradient_step(self, x, y):
         """
@@ -172,8 +163,7 @@ class AffineNN(MethodPluginABC):
         tmp = nn.functional.one_hot(y, lb.size(-1))
         z = torch.where(tmp.bool(), lb, ub)
         loss_cls = self.criterion(z, y)
-    
-        total_loss = loss_cls + loss
+        total_loss = 10*loss_cls + loss
 
         self.optimizer.zero_grad()
         total_loss.backward()
