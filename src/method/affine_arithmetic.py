@@ -112,9 +112,10 @@ class AffineNN(MethodPluginABC):
                 elif isinstance(layer, nn.Linear):
                     affine_func = affine_func.linear(layer)
                 elif isinstance(layer, nn.ReLU):
-                    slope = self.slope_relu_params[relu_param_idx]
-                    affine_func = affine_func.relu(slope)
-                    relu_param_idx += 1
+                    if self.optimize_bounds:
+                        slope = self.slope_relu_params[relu_param_idx]
+                        affine_func = affine_func.relu(slope)
+                        relu_param_idx += 1
                 else:
                     raise NotImplementedError(f"Layer type {type(layer)} not supported.")
             
