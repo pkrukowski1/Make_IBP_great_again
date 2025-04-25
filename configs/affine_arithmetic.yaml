@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - network: mlp
+  - network: conv_small_mnist
   - dataset: mnist
   - method: composer_affine_arithmetic
 
