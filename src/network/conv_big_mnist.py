@@ -3,12 +3,12 @@ import torch
 
 import logging
 
-from .utils import load_model
+from .utils import load_conv_model
 
 log = logging.getLogger(__name__)
 
 
-class ConvBig(nn.Module):
+class ConvBigMNIST(nn.Module):
     """
     ConvBig: A convolutional neural network model for feature extraction and classification.
     This class defines a convolutional neural network with multiple convolutional layers 
@@ -20,7 +20,7 @@ class ConvBig(nn.Module):
         model_path (str, optional): Path to a pre-trained model file. If provided, the model 
             weights will be loaded from this file.
     Methods:
-        __init__(in_channels: int, dim_out: int, model_path: str = None):
+        __init__(dim_out: int, model_path: str = None):
             Initializes the ConvBig model with the specified input channels, output dimensions, 
             and an optional path to a pre-trained model.
         _build() -> nn.Sequential:
@@ -30,11 +30,10 @@ class ConvBig(nn.Module):
             Defines the forward pass of the model. Takes an input tensor `x` and returns the 
             output tensor after passing through the network.
     """
-    def __init__(self, in_channels: int, dim_out: int, model_path: str = None) -> None:
+    def __init__(self, dim_out: int, model_path: str = None) -> None:
         """
         Initializes the class with the given parameters.
         Args:
-            in_channels (int): The number of input channels for the model.
             dim_out (int): The dimensionality of the output.
             model_path (str, optional): Path to a pre-trained model to load. Defaults to None.
         Attributes:
@@ -45,13 +44,16 @@ class ConvBig(nn.Module):
             If `model_path` is provided, loads the model from the specified path and logs the action.
         """
         super().__init__()
-        self.model = self._build()
 
-        self.in_channels = in_channels
+        self.in_channels = 1
+        self.input_height = 28
+        self.input_width = 28
         self.dim_out = dim_out
+
+        self.model = self._build()
         
         if model_path is not None:
-            load_model(self.model, model_path)
+            load_conv_model(self.model, model_path)
             log.info(f"Model loaded from {model_path}")
 
     def _build(self) -> nn.Sequential:

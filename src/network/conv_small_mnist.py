@@ -3,12 +3,12 @@ import torch
 
 import logging
 
-from .utils import load_model
+from .utils import load_conv_model
 
 log = logging.getLogger(__name__)
 
 
-class ConvSmall(nn.Module):
+class ConvSmallMNIST(nn.Module):
     """
     A convolutional neural network model designed for small-scale image processing tasks.
     The model consists of a feature extractor using convolutional layers followed by a classifier.
@@ -17,7 +17,7 @@ class ConvSmall(nn.Module):
         dim_out (int): Dimension of the output layer (number of classes or regression targets).
         model_path (str, optional): Path to a pre-trained model to load. Defaults to None.
     Methods:
-        __init__(in_channels: int, dim_out: int, model_path: str = None):
+        __init__(dim_out: int, model_path: str = None):
             Initializes the ConvSmall model.
         _build() -> nn.Sequential:
             Builds the architecture of the ConvSmall model.
@@ -25,23 +25,25 @@ class ConvSmall(nn.Module):
             Defines the forward pass of the ConvSmall model.
     """
         
-    def __init__(self, in_channels: int, dim_out: int, model_path: str = None) -> None:
+    def __init__(self, dim_out: int, model_path: str = None) -> None:
         """
         Initializes the ConvSmall model.
         Args:
-            in_channels (int): Number of input channels for the convolutional layers.
             dim_out (int): Dimension of the output layer (number of classes or regression targets).
             model_path (str, optional): Path to a pre-trained model to load. If provided, the model
                                          weights will be loaded from this path. Defaults to None.
         """
         super().__init__()
-        self.model = self._build()
 
-        self.in_channels = in_channels
+        self.in_channels = 1
+        self.input_height = 28
+        self.input_width = 28
         self.dim_out = dim_out
 
+        self.model = self._build()
+
         if model_path is not None:
-            load_model(self.model, model_path)
+            load_conv_model(self.model, model_path)
             log.info(f"Model loaded from {model_path}")
 
     def _build(self) -> nn.Sequential:

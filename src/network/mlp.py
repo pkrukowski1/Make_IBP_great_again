@@ -4,7 +4,7 @@ import logging
 
 import torch
 
-from .utils import load_model
+from .utils import load_linear_model
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class MLP(nn.Module):
         self.model = self._build(layers, activation_fnc)
 
         if model_path is not None:
-            load_model(self.model, model_path)
+            load_linear_model(self.model, model_path)
             log.info(f"Model loaded from {model_path}")
 
     def _build(self, layers: List[int], activation_fnc: Callable) -> nn.Sequential:

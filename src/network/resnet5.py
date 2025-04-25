@@ -6,7 +6,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-from .utils import load_model
+from .utils import load_conv_model
 
 class BasicBlock(nn.Module):
     """
@@ -179,7 +179,7 @@ class ResNet5(nn.Module):
             exit("last_layer type not supported!")
 
         if model_path is not None:
-            load_model(self.model, model_path)
+            load_conv_model(self.model, model_path)
             log.info(f"Model loaded from {model_path}")
 
     def _make_layer(self, 
