@@ -138,7 +138,7 @@ class AffineNN(MethodPluginABC):
         """
 
         # Minimize interval width
-        loss_tight = torch.mean((z_U - z_L) ** 2)
+        loss_tight = torch.mean(z_U - z_L)
 
         # Ensure lower bound <= upper bound
         loss_valid = self.lambda_valid * torch.mean(torch.clamp(z_L - z_U, min=0))
