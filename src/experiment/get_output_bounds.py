@@ -59,7 +59,7 @@ def verify_point(output_bounds: Interval, label: torch.Tensor) -> float:
         if y_pred == label:
             verified = 0.0
             lower_bound_gt = lower_bound[y_pred]
-            upper_bound_non_gt = upper_bound[torch.arange(upper_bound.size(0)) != y_pred]
+            upper_bound_non_gt = upper_bound[torch.arange(upper_bound.size(0), device=upper_bound.device) != y_pred]
             if (lower_bound_gt > upper_bound_non_gt).all():
                 verified = 1.0
 
@@ -110,6 +110,7 @@ def run(config: DictConfig):
         # Calculate metrics
         output_bounds_length = torch.max(ub - lb, dim=-1).values.item()
         verified = verify_point(int_output_bounds, y)
+        print(f"Batch {batch_idx+1}, Verified: {verified}")
         verified_points.extend([] if verified is None else [verified])
         
         # Log to wandb
