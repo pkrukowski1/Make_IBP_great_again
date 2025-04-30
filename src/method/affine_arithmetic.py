@@ -164,7 +164,7 @@ class AffineNN(MethodPluginABC):
         tmp = nn.functional.one_hot(y, lb.size(-1))
         z = torch.where(tmp.bool(), lb, ub)
         loss_cls = self.criterion(z, y)
-        total_loss = loss_cls + loss
+        total_loss = 10 * loss_cls + loss
 
         self.optimizer.zero_grad()
         total_loss.backward()
@@ -433,18 +433,18 @@ class AffineFunc:
         return g
     
     def conv2d(self, conv_layer: nn.Conv2d):
-        C, H, W, a = self.coeffs.shape
-        padding = conv_layer.padding
-        kernel_size = conv_layer.kernel_size
-        stride = conv_layer.stride
-        kernel = conv_layer.weight
-
         x = self.coeffs.permute(3, 0, 1, 2)
-        x = F.unfold(x, kernel_size=kernel_size, padding=padding, stride=stride).permute(2, 1, 0)
-        x = torch.einsum("pba,cb->cpa", x, kernel.view(kernel.size(0), -1))
+        x = F.conv2d(
+            x,
+            weight=conv_layer.weight,
+            bias=None,
+            stride=conv_layer.stride,
+            padding=conv_layer.padding,
+            dilation=conv_layer.dilation,
+            groups=conv_layer.groups
+        )
+        x = x.permute(1, 2, 3, 0)  # H_out, W_out, a, C_out
 
-        space_dim = int(math.sqrt(x.size(1)))
-        x = x.reshape(x.size(0), space_dim, space_dim, a)
         if conv_layer.bias is not None:
             x[..., 0] += conv_layer.bias.view(-1, *([1] * (x.dim() - 2)))
 
