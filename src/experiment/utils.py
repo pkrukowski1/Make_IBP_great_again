@@ -1,0 +1,112 @@
+import torch
+import torch.nn.functional as F
+from torchvision.utils import save_image
+
+import os
+
+from method.interval_arithmetic import Interval
+
+from omegaconf import DictConfig
+from hydra.utils import instantiate
+
+
+def squeeze_batch_dim(tensor: torch.Tensor) -> torch.Tensor:
+    """Squeeze batch dimension if batch size is 1, else return unchanged."""
+    return tensor.squeeze(0) if tensor.size(0) == 1 else tensor
+
+def get_dataloader(config: DictConfig, fabric) -> torch.utils.data.DataLoader:
+    """
+    Initializes and returns a dataloader using the provided configuration and fabric.
+    Args:
+        config (dict): A configuration object containing the dataset settings.
+        fabric (object): An object responsible for setting up dataloaders.
+    Returns:
+        DataLoader: A dataloader instance prepared using the specified configuration and fabric.
+    """
+    return fabric.setup_dataloaders(instantiate(config.dataset))
+
+def verify_point(output_bounds: Interval, label: torch.Tensor) -> float:
+    """
+    Verifies whether the predicted label for a given point is robustly classified
+    based on the provided output bounds.
+    Args:
+        output_bounds (Interval): An object representing the interval bounds of the
+            model's output logits. It should provide methods to access the midpoint,
+            lower bounds, and upper bounds of the logits.
+        label (torch.Tensor): A tensor containing the ground truth label for the
+            input point.
+    Returns:
+        float: A verification result where 1.0 indicates that the point is verified.
+    """
+    with torch.no_grad():
+        logits = output_bounds.midpoint()
+        preds = F.softmax(logits, dim=-1)
+        y_pred = torch.argmax(preds, dim=-1)
+
+        lower_bound = output_bounds.lower
+        upper_bound = output_bounds.upper
+
+        lower_bound = squeeze_batch_dim(lower_bound)
+        upper_bound = squeeze_batch_dim(upper_bound)
+        verified = None
+
+        if y_pred == label:
+            verified = 0.0
+            lower_bound_gt = lower_bound[y_pred]
+            upper_bound_non_gt = upper_bound[torch.arange(upper_bound.size(0), device=upper_bound.device) != y_pred]
+            if (lower_bound_gt > upper_bound_non_gt).all():
+                verified = 1.0
+
+        return verified
+    
+def add_salt_and_pepper(x: torch.Tensor, amount: float = 0.02, salt_vs_pepper: float = 0.5) -> torch.Tensor:
+    """
+    Adds salt and pepper noise to a tensor, supporting flattened or image-shaped tensors.
+    Automatically adapts to the value range of the input tensor.
+
+    Args:
+        x (torch.Tensor): Input tensor (flattened or shaped), any value range.
+        amount (float): Proportion of values to alter.
+        salt_vs_pepper (float): Proportion of salt noise vs pepper.
+
+    Returns:
+        torch.Tensor: Noisy tensor.
+    """
+    noisy = x.clone()
+    noisy = squeeze_batch_dim(noisy)
+    min_val = noisy.min()
+    max_val = noisy.max()
+
+    if noisy.dim() == 1:
+        num_elements = noisy.numel()
+        num_salt = int(amount * num_elements * salt_vs_pepper)
+        num_pepper = int(amount * num_elements * (1.0 - salt_vs_pepper))
+
+        # Salt
+        indices = torch.randint(0, num_elements, (num_salt,))
+        noisy[indices] = max_val
+
+        # Pepper
+        indices = torch.randint(0, num_elements, (num_pepper,))
+        noisy[indices] = min_val
+
+    else:
+        if noisy.dim() == 3:
+            noisy = noisy.unsqueeze(0)
+        N, C, H, W = noisy.shape
+        num_pixels = H * W
+        num_salt = int(amount * num_pixels * salt_vs_pepper)
+        num_pepper = int(amount * num_pixels * (1.0 - salt_vs_pepper))
+
+        for img in noisy:
+            coords = [torch.randint(0, H, (num_salt,)), torch.randint(0, W, (num_salt,))]
+            img[:, coords[0], coords[1]] = max_val
+
+            coords = [torch.randint(0, H, (num_pepper,)), torch.randint(0, W, (num_pepper,))]
+            img[:, coords[0], coords[1]] = min_val
+
+        if x.dim() == 3:
+            noisy = noisy.squeeze(0)
+
+    return noisy
+

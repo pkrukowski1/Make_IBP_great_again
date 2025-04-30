@@ -17,5 +17,4 @@ def preprocess_config(config: DictConfig):
     """
     Sets config.exp.log_dir to date extracted from metadata.
     """
-
     config.exp.log_dir = extract_output_dir(config)

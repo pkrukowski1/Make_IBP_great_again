@@ -1,14 +1,9 @@
 defaults:
   - _self_
-  - network: conv_small_cifar
-  - dataset: cifar10
+  - network: mlp
+  - dataset: mnist
   - method: composer_affine_arithmetic
-
-exp:
-  seed: 42
-  log_dir: # set during runtime to automatically created dir
-  run_func: 
-    _target_: experiment.run_get_output_bounds
+  - exp: salt_and_pepper
 
 fabric:
   _target_: lightning.Fabric

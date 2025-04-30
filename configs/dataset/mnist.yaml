@@ -3,6 +3,6 @@ dataset:
   _target_: dataset.MNIST
   data_path: ${oc.env:DATA_DIR}/mnist
   train: false
-  flatten: false
-  no_points: 1000
+  flatten: true
+  no_points: 100
 batch_size: 1

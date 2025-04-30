@@ -16,9 +16,6 @@ else
     echo "Warning: .env file not found at ${PROJECT_ROOT}/.env"
 fi
 
-# Set environment variables (fallback if not in .env)
-export WANDB_MODE=offline
-export HYDRA_FULL_ERROR=0
 
 echo "Script directory: ${SCRIPT_DIR}"
 echo "Current working directory: $(pwd)"
