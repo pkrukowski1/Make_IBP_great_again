@@ -443,7 +443,7 @@ class AffineFunc:
             dilation=conv_layer.dilation,
             groups=conv_layer.groups
         )
-        x = x.permute(1, 2, 3, 0)  # H_out, W_out, a, C_out
+        x = x.permute(1, 2, 3, 0)
 
         if conv_layer.bias is not None:
             x[..., 0] += conv_layer.bias.view(-1, *([1] * (x.dim() - 2)))
