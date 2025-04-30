@@ -12,6 +12,7 @@ import torch.nn.functional as F
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
+DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 class AffineNN(MethodPluginABC):
     """
@@ -163,7 +164,7 @@ class AffineNN(MethodPluginABC):
         tmp = nn.functional.one_hot(y, lb.size(-1))
         z = torch.where(tmp.bool(), lb, ub)
         loss_cls = self.criterion(z, y)
-        total_loss = 10*loss_cls + loss
+        total_loss = loss_cls + loss
 
         self.optimizer.zero_grad()
         total_loss.backward()
@@ -193,11 +194,11 @@ class AffineNN(MethodPluginABC):
                         prev_layer = m[idx-1]
                         if isinstance(prev_layer, nn.Conv2d):
                             out_shape = self.module.layer_outputs.get(prev_layer)
-                            slope = nn.Parameter(torch.log(0.5*torch.ones(out_shape)), requires_grad=True)
+                            slope = nn.Parameter(torch.log(0.5*torch.ones(out_shape)), requires_grad=True).to(DEVICE)
                         elif isinstance(prev_layer, nn.Linear):
-                            slope = nn.Parameter(torch.log(0.5*torch.ones(prev_layer.out_features)), requires_grad=True)
+                            slope = nn.Parameter(torch.log(0.5*torch.ones(prev_layer.out_features)), requires_grad=True).to(DEVICE)
                         self.slope_relu_params.append(slope)
-            
+
             self.optimizer = torch.optim.Adam([*self.slope_relu_params], lr=self.lr)
             self.criterion = nn.CrossEntropyLoss()
 
@@ -215,8 +216,9 @@ class AffineFunc:
     Attributes:
         coeffs (torch.Tensor): The coefficients of the affine function.
         expr (AffineExpr): The affine expression associated with the function.
+        device (str): "cpu" or "cuda". Default value set up to "cuda".
     Methods:
-        __init__(shape: tuple = None, c: torch.Tensor = None, expr: 'AffineExpr' = None):
+        __init__(shape: tuple = None, c: torch.Tensor = None, expr: 'AffineExpr' = None, device: str = "cpu"):
             Initializes an AffineFunc object with the given shape, coefficients, and expression.
         add_var(c, mask):
             Adds a variable to the affine expression.
@@ -259,6 +261,8 @@ class AffineFunc:
         else:
             self.expr = expr
             self.coeffs = torch.zeros(shape)
+        
+        self.coeffs = self.coeffs.to(DEVICE)
 
     def add_var(self, c, mask):
         self.expr.add_var(self, c, mask)
@@ -335,7 +339,7 @@ class AffineFunc:
         return self * other
         
     def to_interval(self):
-        ones = torch.ones((*self.coeffs.shape[:-1], self.coeffs.shape[-1] - 1))
+        ones = torch.ones((*self.coeffs.shape[:-1], self.coeffs.shape[-1] - 1)).to(device=DEVICE)
         I = Interval(-ones, ones)
         result = I * self.coeffs[..., 1:]
         result.lower = torch.sum(result.lower, axis=-1) + self.coeffs[..., 0]
@@ -515,7 +519,7 @@ class AffineExpr:
             f.coeffs[mask_a0] = mid
             r = torch.maximum(torch.abs(q.lower), torch.abs(q.upper))
             r = torch.diag(r)
-            new_var = torch.zeros((*f.coeffs.shape[:-1], c.lower.numel()))
+            new_var = torch.zeros((*f.coeffs.shape[:-1], c.lower.numel())).to(DEVICE)
             new_var[mask] = r
             self.current += c.lower.numel()
             f.coeffs = torch.concatenate((f.coeffs, new_var), axis=-1)
