@@ -1,10 +1,16 @@
 import torch
 import torch.nn.functional as F
 from torchvision.utils import save_image
+import torchvision.transforms as transforms
 
 import os
+import uuid
+from typing import Union
 
 from method.interval_arithmetic import Interval
+from dataset.mnist import MNIST
+from dataset.cifar10 import CIFAR10
+from dataset.svhn import SVHN
 
 from omegaconf import DictConfig
 from hydra.utils import instantiate
@@ -110,3 +116,35 @@ def add_salt_and_pepper(x: torch.Tensor, amount: float = 0.02, salt_vs_pepper: f
 
     return noisy
 
+def save_deteriotated_image(x: torch.Tensor, flatten: bool, folder: str, 
+                            dataset: str) -> None:
+    """
+    Save a deteriorated image from a tensor to disk.
+
+    Args:
+        x (torch.Tensor): Image tensor (either flattened or in CHW format).
+        flatten (bool): Whether the tensor is flattened (e.g., from a dataset like MNIST).
+        folder (str): Path to the directory where the deteriorated image will be saved.
+        dataset (str): Name of the dataset (needed if flatten=True).
+    """
+    x = x.clone().detach()
+    x = squeeze_batch_dim(x)
+
+    if flatten:
+        if "MNIST" in dataset:
+            x = x.view(1, 28, 28)
+        elif "CIFAR10" in dataset or "SVHN" in dataset:
+            x = x.view(3, 32, 32)
+        else:
+            raise ValueError(f"Flattened image saving not implemented for dataset: {dataset}")
+
+    if x.max() <= 1.0:
+        x = x * 255.0
+    x = x.to(torch.uint8)
+
+    to_pil = transforms.ToPILImage()
+    img = to_pil(x)
+
+    os.makedirs(f"{folder}/deteriorated_images", exist_ok=True)
+    img_path = f"{folder}/deteriorated_images/image_{uuid.uuid4().hex[:8]}.png"
+    img.save(img_path)

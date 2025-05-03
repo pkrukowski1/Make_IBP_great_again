@@ -10,7 +10,7 @@ from hydra.utils import instantiate
 from tqdm import tqdm
 from utils.fabric import setup_fabric
 from utils.hydra import extract_output_dir
-from experiment.utils import get_dataloader, verify_point, add_salt_and_pepper
+from experiment.utils import get_dataloader, verify_point, add_salt_and_pepper, save_deteriotated_image
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -43,6 +43,13 @@ def run(config: DictConfig):
         y = fabric.to_device(y)
 
         X = add_salt_and_pepper(X, amount=config.exp.amount, salt_vs_pepper=config.exp.salt_vs_pepper)
+        if config.exp.save_images:
+            save_deteriotated_image(
+                x=X,
+                flatten=config.dataset.dataset.flatten,
+                folder=extracted_output_dir,
+                dataset=config.dataset.dataset._target_
+            )
         
         start_time = time.time()
         
