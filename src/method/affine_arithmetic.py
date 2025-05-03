@@ -21,13 +21,14 @@ class AffineNN(MethodPluginABC):
     and gradient-based optimization.
     Attributes:
         module (nn.Module): The neural network module to analyze.
-        epsilon (float): The interval radii.
+        epsilon (float): The interval radius.
         optimize_bounds (bool): Flag indicating whether to optimize bounds using gradient-based methods.
         gradient_iter (int): Number of gradient iterations for optimizing bounds (required if optimize_bounds is True).
         lr (float): Learning rate for the optimizer used in bounds optimization.
-        lambda_valid (float): Coefficient for ensuring that upper bound is greater than lower bound.
+        lambda_valid (float): Coefficient for ensuring that the upper bound is greater than the lower bound.
+        lambda_worst_case (float): Coefficient for weighting the worst-case loss.
     Methods:
-        __init__(optimize_bounds, gradient_iter=0, lr=0.1):
+        __init__(epsilon, optimize_bounds, gradient_iter=0, lr=0.1, lambda_valid=0.1, lambda_worst_case=10):
             Initializes the AffineNN object with the given parameters.
         get_bounds(x):
             Computes the affine arithmetic bounds for the input tensor `x` with perturbation `epsilon`.
@@ -43,7 +44,7 @@ class AffineNN(MethodPluginABC):
             Returns:
                 torch.Tensor: The computed loss for interval tightening.
         _gradient_step(x, y):
-            Performs a single gradient step to optimize the bounds using the input tensor, 
+            Performs a single gradient step to optimize the bounds using the input tensor 
             and target labels.
             Args:
                 x (torch.Tensor): Input tensor.
@@ -62,7 +63,8 @@ class AffineNN(MethodPluginABC):
                  optimize_bounds: bool, 
                  gradient_iter: int = 0,
                  lr: float = 0.1,
-                 lambda_valid: float = 0.1
+                 lambda_valid: float = 0.1,
+                 lambda_worst_case: float = 10.0
                  ):
         
         super().__init__()
@@ -75,6 +77,7 @@ class AffineNN(MethodPluginABC):
         
         self.gradient_iter = gradient_iter
         self.lambda_valid = lambda_valid
+        self.lambda_worst_case = lambda_worst_case
         self.lr = lr
 
         log.info(f"Initialized Affine Arithmetic object with optimize_bounds={optimize_bounds}")
@@ -164,7 +167,7 @@ class AffineNN(MethodPluginABC):
         tmp = nn.functional.one_hot(y, lb.size(-1))
         z = torch.where(tmp.bool(), lb, ub)
         loss_cls = self.criterion(z, y)
-        total_loss = 10 * loss_cls + loss
+        total_loss = self.lambda_worst_case * loss_cls + loss
 
         self.optimizer.zero_grad()
         total_loss.backward()
