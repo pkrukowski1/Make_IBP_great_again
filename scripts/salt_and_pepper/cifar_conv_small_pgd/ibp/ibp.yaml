@@ -1,0 +1,44 @@
+defaults:
+  - _self_
+
+exp:
+  seed: 1
+  log_dir: # set during runtime to automatically created dir
+  run_func: 
+    _target_: experiment.run_salt_and_pepper
+  amount: 0.2         # How much pixels are affected
+  salt_vs_pepper: 0.5 # Ratio between salt and pepper
+  save_images: True   # To indicate if deteriotated images should be saved
+
+fabric:
+  _target_: lightning.Fabric
+  num_nodes: 1
+  devices: 1
+  accelerator: cpu # or gpu
+
+wandb:
+  entity: ${oc.env:WANDB_ENTITY}
+  project: ${oc.env:WANDB_PROJECT}
+
+network:
+  _target_: network.ConvSmallCIFAR
+  dim_out: 10
+  model_path: ${oc.env:MODEL_DIR}/cifar_conv_small_pgd.pth
+
+method:
+  _partial_: True
+  _target_: method.Composer
+  plugins:
+    - _target_: method.IBP
+      epsilon: 0.00784313725
+
+dataset:
+  _target_: torch.utils.data.DataLoader
+  dataset:
+    _target_: dataset.CIFAR10
+    data_path: ${oc.env:DATA_DIR}/cifar10
+    train: false
+    flatten: false
+    no_points: 1000
+  batch_size: 1
+
