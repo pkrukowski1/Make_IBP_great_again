@@ -3,13 +3,13 @@ defaults:
   - network: conv_small_cifar
   - dataset: cifar10
   - method: composer_ibp
-  - exp: get_output_bounds
+  - exp: output_vs_input
 
 fabric:
   _target_: lightning.Fabric
   num_nodes: 1
   devices: 1
-  accelerator: cpu # or gpu
+  accelerator: cpu
 
 wandb:
   entity: ${oc.env:WANDB_ENTITY}

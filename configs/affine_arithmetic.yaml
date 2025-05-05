@@ -9,7 +9,7 @@ fabric:
   _target_: lightning.Fabric
   num_nodes: 1
   devices: 1
-  accelerator: cpu # or gpu
+  accelerator: cpu
 
 wandb:
   entity: ${oc.env:WANDB_ENTITY}
