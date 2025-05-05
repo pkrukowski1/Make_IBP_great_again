@@ -82,7 +82,7 @@ def run(config: DictConfig):
             
     # Calculate overall metrics
     overall_avg_time = np.mean(processing_times)
-    overall_verified_points = np.mean(verified_points)
+    overall_verified_points = np.sum(verified_points) / len(dataloader)
     wandb.log({
         "overall_avg_processing_time_per_image": overall_avg_time,
         "overall_verified_points": overall_verified_points

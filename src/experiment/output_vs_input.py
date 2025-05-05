@@ -84,7 +84,7 @@ def run(config: DictConfig):
 
         # Compute overall metrics for this epsilon
         overall_avg_time = float(np.mean(processing_times)) if processing_times else 0.0
-        overall_verified_points = float(np.mean(verified_points)) if verified_points else 0.0
+        overall_verified_points = float(np.sum(verified_points) / len(dataloader)) if verified_points else 0.0
 
         stats = {
             "epsilon": float(eps),
