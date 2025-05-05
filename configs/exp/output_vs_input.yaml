@@ -1,0 +1,7 @@
+__partial__: True
+
+seed: 42
+log_dir: # set during runtime to automatically created dir
+max_radii: 0.0156862745
+run_func: 
+  _target_: experiment.run_output_vs_input

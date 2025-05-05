@@ -4,6 +4,7 @@ import time
 import torch
 import wandb
 import json
+import os
 
 from omegaconf import DictConfig
 from hydra.utils import instantiate
@@ -16,8 +17,7 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
 def run(config: DictConfig):
-    # Initialize wandb
-    wandb.init(project="image_processing", config=dict(config))
+    wandb.init(project=os.environ['WANDB_PROJECT'], config=dict(config))
     
     log.info(f'Launching Fabric')
     fabric = setup_fabric(config)
