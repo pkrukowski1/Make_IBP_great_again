@@ -11,6 +11,7 @@ from method.interval_arithmetic import Interval
 from dataset.mnist import MNIST
 from dataset.cifar10 import CIFAR10
 from dataset.svhn import SVHN
+from method.method_plugin_abc import MethodPluginABC
 
 from omegaconf import DictConfig
 from hydra.utils import instantiate
@@ -148,3 +149,28 @@ def save_deteriotated_image(x: torch.Tensor, flatten: bool, folder: str,
     os.makedirs(f"{folder}/deteriorated_images", exist_ok=True)
     img_path = f"{folder}/deteriorated_images/image_{uuid.uuid4().hex[:8]}.png"
     img.save(img_path)
+
+def generate_boundary_points(method: MethodPluginABC, X: torch.Tensor, y: torch.Tensor, 
+                             epsilon: float = 1e-2) -> torch.Tensor:
+    """
+    Generates perturbed inputs near the decision boundary by applying
+    small gradient-based perturbations.
+
+    Args:
+        method (MethodPluginABC): The method plugin used for predictions.
+        X (torch.Tensor): The input tensor for which boundary points are to be generated.
+        y (torch.Tensor): The ground truth labels corresponding to the input tensor.
+        epsilon (float, optional): The magnitude of the perturbation to be applied. Defaults to 1e-2.
+    Returns:
+        torch.Tensor: A tensor containing the perturbed inputs near the decision boundary.
+    """
+    X = X.clone().detach().requires_grad_(True)
+    criterion = torch.nn.CrossEntropyLoss()
+    output_bounds = method.forward(X,y)
+    loss = criterion(output_bounds.midpoint(), y)
+    loss.backward()
+    
+    # Add perturbation in direction of gradient
+    grad = X.grad.data
+    X_boundary = X + epsilon * torch.sign(grad)
+    return X_boundary.detach()
