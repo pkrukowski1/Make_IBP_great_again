@@ -170,7 +170,7 @@ class AffineNN(MethodPluginABC):
         tmp = nn.functional.one_hot(y, lb.size(-1))
         z = torch.where(tmp.bool(), lb, ub)
         loss_cls = self.criterion(z, y)
-        total_loss = self.lambda_worst_case * loss_cls + loss
+        total_loss = self.lambda_worst_case * (loss_cls + relu_loss) + loss
 
         self.optimizer.zero_grad()
         total_loss.backward()
