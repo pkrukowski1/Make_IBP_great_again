@@ -383,8 +383,12 @@ class AffineFunc:
 
         M = a0 + S
         B = 0.5 * e * M 
-        D = torch.abs(B-(c.upper-a0))
-
+        
+        D = self.projected_gradient_ascent(
+            c=learnable_c.clone().requires_grad_(True),
+            a=self.coeffs[..., 1:].clone(),
+            a0=a0.clone()
+        )
         result = AffineFunc(shape=self.coeffs.shape, expr=self.expr)
         result.coeffs = learnable_c * self.coeffs
         result.coeffs[..., 0] = B
@@ -396,12 +400,51 @@ class AffineFunc:
         i2 = Interval((1-e)*M, (1-e)*M)
         hull_lower, hull_upper = interval_hull(i1, i2)
         
-        error = D.mean()
+        error = (hull_upper - hull_lower).mean()
 
         result.coeffs[mask1] *= 0.0
         result.coeffs[mask2] = self.coeffs[mask2]
         result.add_var(Interval(hull_lower, hull_upper), mask3)
         return result, error
+    
+    def projected_gradient_ascent(self, c, a, a0, lr=0.01, steps=5):
+        """
+        Perform projected gradient ascent with the constraint: sum(a_i * t_i) = -a0
+        
+        Args:
+            c: Tensor of coefficients for the objective function (shape: [N])
+            a: Tensor of coefficients for the linear constraint (shape: [N])
+            a0: Scalar constraint value
+            lr: Learning rate for gradient ascent
+            steps: Number of steps for optimization
+        
+        Returns:
+            t_opt: Optimized t values (shape: [N])
+            max_val: Maximum value of the objective function
+        """
+       # Detach learnable parameters
+        a = a.detach()
+        a0 = a0.detach()
+        c = c.detach()
+
+        # Optimize t ∈ [-1, 1]^n
+        t = torch.zeros_like(a).requires_grad_(True)
+
+        for _ in range(steps):
+            A_t = torch.sum(a * t, dim=-1) + a0
+            B_t = torch.sum(c * a * t, dim=-1)
+
+            relu = torch.relu(A_t)
+            obj = relu - B_t
+            loss = obj.mean()
+
+            loss.backward(retain_graph=True)
+            with torch.no_grad():
+                t += lr * t.grad
+                t.clamp_(-1, 1)
+                t.grad.zero_()
+
+        return obj
     
     def softmax(self):
         x = self.coeffs[..., 0]
