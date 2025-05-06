@@ -111,7 +111,7 @@ class AffineNN(MethodPluginABC):
         relu_loss = 0.0
 
         for m in self.module.module.children():
-            for layer in m:
+            for idx_layer, layer in enumerate(m):
                 if isinstance(layer, nn.Conv2d):
                     affine_func = affine_func.conv2d(layer)
                 elif isinstance(layer, nn.Linear):
@@ -120,7 +120,7 @@ class AffineNN(MethodPluginABC):
                     if self.optimize_bounds:
                         slope = self.slope_relu_params[relu_param_idx]
                         affine_func, error = affine_func.relu(slope)
-                        relu_loss += error
+                        relu_loss += (idx_layer+1)*error
                         relu_param_idx += 1
                 elif isinstance(layer, nn.Flatten):
                     affine_func = affine_func.flatten()
@@ -170,7 +170,7 @@ class AffineNN(MethodPluginABC):
         tmp = nn.functional.one_hot(y, lb.size(-1))
         z = torch.where(tmp.bool(), lb, ub)
         loss_cls = self.criterion(z, y)
-        total_loss = self.lambda_worst_case * (loss_cls + relu_loss) + loss
+        total_loss = self.lambda_worst_case * loss_cls + relu_loss + loss
 
         self.optimizer.zero_grad()
         total_loss.backward()
