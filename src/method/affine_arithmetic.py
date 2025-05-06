@@ -92,7 +92,9 @@ class AffineNN(MethodPluginABC):
         Args:
             x (float): The center value of the input interval.
         Returns:
+            Tuple:
             Interval: The resulting interval bounds after propagating through the network.
+            torch.Tensor: The accumulated error of the ReLU approximation.
         Raises:
             NotImplementedError: If the network contains a layer type that is not supported.
         """
@@ -106,6 +108,7 @@ class AffineNN(MethodPluginABC):
         affine_func = expr.new_tensor(interval)
 
         relu_param_idx = 0  # Track which learnable ReLU param to use
+        relu_loss = 0.0
 
         for m in self.module.module.children():
             for layer in m:
@@ -116,12 +119,12 @@ class AffineNN(MethodPluginABC):
                 elif isinstance(layer, nn.ReLU):
                     if self.optimize_bounds:
                         slope = self.slope_relu_params[relu_param_idx]
-                        affine_func = affine_func.relu(slope)
+                        affine_func, error = affine_func.relu(slope)
+                        relu_loss += error
                         relu_param_idx += 1
                 elif isinstance(layer, nn.Flatten):
                     affine_func = affine_func.flatten()
-            
-        return affine_func.to_interval()
+        return affine_func.to_interval(), relu_loss
     
     def tighten_up_intervals(self, z_L: torch.Tensor, z_U: torch.Tensor) -> torch.Tensor:
         """
@@ -158,7 +161,7 @@ class AffineNN(MethodPluginABC):
             total loss is computed as the sum of these two losses. The optimizer is
             then used to perform a gradient descent step to minimize the total loss.
         """
-        outputs = self.get_bounds(x)   
+        outputs, relu_loss = self.get_bounds(x)
         loss = self.tighten_up_intervals(outputs.lower, outputs.upper)
         
         lb = outputs.lower.unsqueeze(0)
@@ -207,7 +210,7 @@ class AffineNN(MethodPluginABC):
 
             for _ in range(self.gradient_iter):            
                 self._gradient_step(x, y)
-        outputs = self.get_bounds(x)
+        outputs, _ = self.get_bounds(x)
            
         return outputs
 
@@ -377,10 +380,13 @@ class AffineFunc:
         i1 = Interval(-D, -D)
         i2 = Interval((1-e)*M, (1-e)*M)
         hull_lower, hull_upper = interval_hull(i1, i2)
+        
+        error = (hull_upper - hull_lower).mean()
+
         result.coeffs[mask1] *= 0.0
         result.coeffs[mask2] = self.coeffs[mask2]
         result.add_var(Interval(hull_lower, hull_upper), mask3)
-        return result
+        return result, error
     
     def softmax(self):
         x = self.coeffs[..., 0]
