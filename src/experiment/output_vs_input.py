@@ -91,7 +91,8 @@ def run(config: DictConfig):
             "overall_avg_processing_time_per_image": overall_avg_time,
             "overall_verified_points_percent": 100 * overall_verified_points,
             "total_batches_processed": batch_idx + 1,
-            "batches": batch_results
+            "avg_max_bounds_length": np.mean([b["output_bounds_length"] for b in batch_results]),
+            "batches": batch_results,
         }
 
         all_results.append(stats)
