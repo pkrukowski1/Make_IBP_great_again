@@ -119,7 +119,10 @@ class AffineNN(MethodPluginABC):
                 elif isinstance(layer, nn.ReLU):
                     if self.optimize_bounds:
                         slope = self.slope_relu_params[relu_param_idx]
-                        affine_func, error = affine_func.relu(slope)
+                        c_params = self.c_params[relu_param_idx]
+
+                        affine_func, error = affine_func.relu(slope, c_params)
+
                         relu_loss += (idx_layer+1)*error
                         relu_param_idx += 1
                 elif isinstance(layer, nn.Flatten):
@@ -194,6 +197,7 @@ class AffineNN(MethodPluginABC):
 
         if self.optimize_bounds:
             self.slope_relu_params = nn.ParameterList()
+            self.c_params = nn.ParameterList()
             for m in self.module.module.children():
                 for idx, layer in enumerate(m):
                     if isinstance(layer, nn.ReLU):
@@ -201,11 +205,15 @@ class AffineNN(MethodPluginABC):
                         if isinstance(prev_layer, nn.Conv2d):
                             out_shape = self.module.layer_outputs.get(prev_layer)
                             slope = nn.Parameter(torch.log(0.5*torch.ones(out_shape)), requires_grad=True).to(DEVICE)
+                            c_params = nn.Parameter(torch.ones(out_shape), requires_grad=True).to(DEVICE)
                         elif isinstance(prev_layer, nn.Linear):
                             slope = nn.Parameter(torch.log(0.5*torch.ones(prev_layer.out_features)), requires_grad=True).to(DEVICE)
+                            c_params = nn.Parameter(torch.ones(prev_layer.out_features), requires_grad=True).to(DEVICE)
                         self.slope_relu_params.append(slope)
+                        c_params = c_params.unsqueeze(1)
+                        self.c_params.append(c_params)
 
-            self.optimizer = torch.optim.Adam([*self.slope_relu_params], lr=self.lr)
+            self.optimizer = torch.optim.Adam([*self.slope_relu_params, *self.c_params], lr=self.lr)
             self.criterion = nn.CrossEntropyLoss()
 
             for _ in range(self.gradient_iter):            
@@ -344,17 +352,25 @@ class AffineFunc:
     def __rmul__(self, other):
         return self * other
         
-    def to_interval(self):
+    def to_interval(self, learnable_c=None):
         ones = torch.ones((*self.coeffs.shape[:-1], self.coeffs.shape[-1] - 1)).to(device=DEVICE)
         I = Interval(-ones, ones)
         result = I * self.coeffs[..., 1:]
-        result.lower = torch.sum(result.lower, axis=-1) + self.coeffs[..., 0]
-        result.upper = torch.sum(result.upper, axis=-1) + self.coeffs[..., 0]
-        
-        return result
 
-    def relu(self, slope):
-        c = self.to_interval()
+        if learnable_c is not None:
+            lb = torch.minimum(result.lower * learnable_c, result.upper * learnable_c)
+            ub = torch.maximum(result.lower * learnable_c, result.upper * learnable_c)
+            result.lower = torch.sum(lb, axis=-1) + self.coeffs[..., 0]
+            result.upper = torch.sum(ub, axis=-1) + self.coeffs[..., 0]
+        else:
+            result.lower = torch.sum(result.lower, axis=-1) + self.coeffs[..., 0]
+            result.upper = torch.sum(result.upper, axis=-1) + self.coeffs[..., 0]
+            
+        return result
+    
+
+    def relu(self, slope, learnable_c):
+        c = self.to_interval(learnable_c)
 
         mask1 = c <= 0
         mask2 = c >= 0
@@ -366,12 +382,11 @@ class AffineFunc:
         S = torch.sum(torch.abs(self.coeffs[..., 1:]), axis=-1)
 
         M = a0 + S
-        B = 0.5 * e * M
-        c = B/S
-        D = torch.abs(B-c*a0)
+        B = 0.5 * e * M 
+        D = torch.abs(B-(c.upper-a0))
 
         result = AffineFunc(shape=self.coeffs.shape, expr=self.expr)
-        result.coeffs = c.unsqueeze(-1) * self.coeffs
+        result.coeffs = learnable_c * self.coeffs
         result.coeffs[..., 0] = B
         D = D[mask3]
         e = e[mask3]
@@ -381,7 +396,7 @@ class AffineFunc:
         i2 = Interval((1-e)*M, (1-e)*M)
         hull_lower, hull_upper = interval_hull(i1, i2)
         
-        error = (hull_upper - hull_lower).mean()
+        error = D.mean()
 
         result.coeffs[mask1] *= 0.0
         result.coeffs[mask2] = self.coeffs[mask2]
