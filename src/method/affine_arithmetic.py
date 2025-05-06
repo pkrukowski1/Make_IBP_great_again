@@ -440,7 +440,7 @@ class AffineFunc:
 
             loss.backward(retain_graph=True)
             with torch.no_grad():
-                t += lr * t.grad
+                t -= lr * t.grad
                 t.clamp_(-1, 1)
                 t.grad.zero_()
 
