@@ -1,0 +1,9 @@
+__partial__: True
+
+seed: 42
+log_dir: # set during runtime to automatically created dir
+run_func: 
+  _target_: experiment.run_points_near_class_boundary
+perturbation: 0.1 # The magnitude of the perturbation to be applied
+save_images: True   # To indicate if images should be saved
+grad_steps: 3

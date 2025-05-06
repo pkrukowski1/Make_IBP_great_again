@@ -118,7 +118,7 @@ def add_salt_and_pepper(x: torch.Tensor, amount: float = 0.02, salt_vs_pepper: f
     return noisy
 
 def save_deteriotated_image(x: torch.Tensor, flatten: bool, folder: str, 
-                            dataset: str) -> None:
+                            dataset: str, path_suffix: str = None) -> None:
     """
     Save a deteriorated image from a tensor to disk.
 
@@ -127,6 +127,7 @@ def save_deteriotated_image(x: torch.Tensor, flatten: bool, folder: str,
         flatten (bool): Whether the tensor is flattened (e.g., from a dataset like MNIST).
         folder (str): Path to the directory where the deteriorated image will be saved.
         dataset (str): Name of the dataset (needed if flatten=True).
+        path_suffix (Optional, str): Name suffix.
     """
     x = x.clone().detach()
     x = squeeze_batch_dim(x)
@@ -147,30 +148,41 @@ def save_deteriotated_image(x: torch.Tensor, flatten: bool, folder: str,
     img = to_pil(x)
 
     os.makedirs(f"{folder}/deteriorated_images", exist_ok=True)
-    img_path = f"{folder}/deteriorated_images/image_{uuid.uuid4().hex[:8]}.png"
+    if path_suffix is not None:
+        img_path = f"{folder}/deteriorated_images/image_{uuid.uuid4().hex[:8]}{path_suffix}.png"
+    else:
+        img_path = f"{folder}/deteriorated_images/image_{uuid.uuid4().hex[:8]}.png"
     img.save(img_path)
 
 def generate_boundary_points(method: MethodPluginABC, X: torch.Tensor, y: torch.Tensor, 
-                             epsilon: float = 1e-2) -> torch.Tensor:
+                             perturbation: float = 1e-2, grad_steps: int = 3) -> torch.Tensor:
     """
     Generates perturbed inputs near the decision boundary by applying
-    small gradient-based perturbations.
+    small gradient-based perturbations over multiple steps.
 
     Args:
         method (MethodPluginABC): The method plugin used for predictions.
         X (torch.Tensor): The input tensor for which boundary points are to be generated.
         y (torch.Tensor): The ground truth labels corresponding to the input tensor.
-        epsilon (float, optional): The magnitude of the perturbation to be applied. Defaults to 1e-2.
+        perturbation (float, optional): The magnitude of the perturbation to be applied per step. Defaults to 1e-2.
+        grad_steps (int, optional): Number of gradient ascent steps to apply. Defaults to 3.
+
     Returns:
         torch.Tensor: A tensor containing the perturbed inputs near the decision boundary.
     """
-    X = X.clone().detach().requires_grad_(True)
-    criterion = torch.nn.CrossEntropyLoss()
-    output_bounds = method.forward(X,y)
-    loss = criterion(output_bounds.midpoint(), y)
-    loss.backward()
-    
-    # Add perturbation in direction of gradient
-    grad = X.grad.data
-    X_boundary = X + epsilon * torch.sign(grad)
-    return X_boundary.detach()
+    X_adv = X.clone().detach()
+
+    for _ in range(grad_steps):
+        X_adv.requires_grad_(True)
+        y_pred = method.module(X_adv)
+        loss = torch.nn.functional.cross_entropy(y_pred, y)
+        loss.backward()
+
+        with torch.no_grad():
+            grad = X_adv.grad
+            X_adv = X_adv + perturbation * torch.sign(grad)
+            X_adv = torch.clamp(X_adv, min=0.0, max=1.0)
+        
+        X_adv = X_adv.detach()
+
+    return X_adv

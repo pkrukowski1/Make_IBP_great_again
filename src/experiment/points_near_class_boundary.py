@@ -11,7 +11,7 @@ from hydra.utils import instantiate
 from tqdm import tqdm
 from utils.fabric import setup_fabric
 from utils.hydra import extract_output_dir
-from experiment.utils import get_dataloader, verify_point, generate_boundary_points
+from experiment.utils import get_dataloader, verify_point, generate_boundary_points, save_deteriotated_image
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -43,20 +43,33 @@ def run(config: DictConfig):
     for batch_idx, (X, y) in enumerate(tqdm(dataloader, desc="Processing batches")):
         X = fabric.to_device(X)
         y = fabric.to_device(y)
-        
         start_time = time.time()
         
         int_output_bounds = method.forward(X, y)
-        log.info(f"Batch {batch_idx+1}, Output Bounds: {int_output_bounds}")
-        
-        # Generate point near the classification boundary
-        X = generate_boundary_points(method, X, y, perturbation=config.exp.perturbation)
         
         # Calculate processing time
         batch_time = time.time() - start_time
         batch_size = X.size(0)
         avg_time_per_image = batch_time / batch_size
         processing_times.append(avg_time_per_image)
+
+        log.info(f"Batch {batch_idx+1}, Output Bounds: {int_output_bounds}")
+        
+        # Generate point near the classification boundary
+        X = generate_boundary_points(method, X, y, perturbation=config.exp.perturbation, 
+                                     grad_steps=config.exp.grad_steps)
+
+        if config.exp.save_images:
+            y_pred = method.module(X)
+            y_pred = torch.argmax(y_pred, dim=-1).item()
+            y_gt = y.item()
+            save_deteriotated_image(
+                x=X,
+                flatten=config.dataset.dataset.flatten,
+                folder=extracted_output_dir,
+                dataset=config.dataset.dataset._target_,
+                path_suffix=f"_pred_{y_pred}_gt_{y_gt}"
+            )
         
         # Convert output_bounds to numpy for logging/saving
         lb = int_output_bounds.lower

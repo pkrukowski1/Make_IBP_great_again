@@ -1,9 +1,9 @@
 defaults:
   - _self_
-  - network: conv_small_cifar
-  - dataset: cifar10
+  - network: mlp
+  - dataset: mnist
   - method: composer_ibp
-  - exp: output_vs_input
+  - exp: points_near_class_boundary
 
 fabric:
   _target_: lightning.Fabric
