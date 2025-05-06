@@ -1,0 +1,7 @@
+_partial_: True
+_target_: method.Composer
+
+plugins:
+  - _target_: method.LowerBound
+    epsilon: 0.01
+    num_points: 1000
