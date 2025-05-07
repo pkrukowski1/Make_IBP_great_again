@@ -410,21 +410,6 @@ class AffineFunc:
         return result, error
     
     def projected_gradient_ascent(self, c, a, a0, lr=0.01, steps=5, tol=1e-6):
-        """
-        Perform projected gradient ascent to maximize sum(c_i * a_i * t_i)
-        subject to the constraint: sum(a_i * t_i) = -a0, with t in [-1, 1]^N.
-
-        Args:
-            c: Tensor of coefficients for the objective function (shape: [..., N] or broadcastable)
-            a: Tensor of coefficients for the linear constraint (shape: [..., N])
-            a0: Scalar or tensor matching batch dims of a (shape: [...] or scalar)
-            lr: Learning rate for gradient ascent
-            steps: Maximum number of optimization steps
-            tol: Tolerance for constraint violation and convergence
-
-        Returns:
-            max_val: Maximum value of the objective function (shape: [...])
-        """
         c = torch.as_tensor(c, dtype=torch.float32).detach()
         a = torch.as_tensor(a, dtype=torch.float32).detach()
         a0 = torch.as_tensor(a0, dtype=torch.float32).detach()
@@ -434,20 +419,17 @@ class AffineFunc:
         t = torch.zeros_like(a, requires_grad=True)
 
         for _ in range(steps):
+            A_t = torch.sum(a * t, dim=-1)
+            relu_A_t = torch.relu(A_t)
             B_t = torch.sum(c * a * t, dim=-1)
-            constraint =  torch.sum(a * t, dim=-1) + a0
-            loss = (-B_t + constraint).mean()
+            loss = (relu_A_t - B_t).mean()
 
             loss.backward()
             with torch.no_grad():
                 t -= lr * t.grad
                 t.clamp_(-1, 1)
                 t.grad.zero_()
-
-                # Check convergence
-                if torch.all(torch.abs(constraint) < tol) and torch.all(torch.abs(t.grad) < tol):
-                    break
-
+                
         max_val = torch.sum(c * a * t, dim=-1)
 
         return max_val
