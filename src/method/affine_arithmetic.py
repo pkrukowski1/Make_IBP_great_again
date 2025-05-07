@@ -409,7 +409,7 @@ class AffineFunc:
         result.add_var(Interval(hull_lower, hull_upper), mask3)
         return result, error
     
-    def projected_gradient_ascent(self, c, a, a0, lr=0.01, steps=5, tol=1e-6):
+    def projected_gradient_ascent(self, c, a, a0, lr=0.01, steps=5):
         c = torch.as_tensor(c, dtype=torch.float32).detach()
         a = torch.as_tensor(a, dtype=torch.float32).detach()
         a0 = torch.as_tensor(a0, dtype=torch.float32).detach()
