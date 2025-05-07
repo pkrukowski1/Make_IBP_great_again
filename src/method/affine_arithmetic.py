@@ -389,6 +389,8 @@ class AffineFunc:
             a=self.coeffs[..., 1:].clone(),
             a0=a0.clone()
         )
+        D = D-B
+
         result = AffineFunc(shape=self.coeffs.shape, expr=self.expr)
         result.coeffs = learnable_c * self.coeffs
         result.coeffs[..., 0] = B
@@ -422,7 +424,7 @@ class AffineFunc:
             t_opt: Optimized t values (shape: [N])
             max_val: Maximum value of the objective function
         """
-       # Detach learnable parameters
+        # Detach learnable parameters
         a = a.detach()
         a0 = a0.detach()
         c = c.detach()
@@ -431,12 +433,11 @@ class AffineFunc:
         t = torch.zeros_like(a).requires_grad_(True)
 
         for _ in range(steps):
-            A_t = torch.sum(a * t, dim=-1) + a0
+            constraint = 0.1*(torch.sum(a * t, dim=-1) + a0)
             B_t = torch.sum(c * a * t, dim=-1)
 
-            relu = torch.relu(A_t)
-            obj = relu - B_t
-            loss = obj.mean()
+            obj = -B_t
+            loss = (obj + constraint).mean()
 
             loss.backward(retain_graph=True)
             with torch.no_grad():
