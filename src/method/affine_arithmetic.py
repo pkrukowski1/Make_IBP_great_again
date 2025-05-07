@@ -409,43 +409,48 @@ class AffineFunc:
         result.add_var(Interval(hull_lower, hull_upper), mask3)
         return result, error
     
-    def projected_gradient_ascent(self, c, a, a0, lr=0.01, steps=5):
+    def projected_gradient_ascent(self, c, a, a0, lr=0.01, steps=5, tol=1e-6):
         """
-        Perform projected gradient ascent with the constraint: sum(a_i * t_i) = -a0
-        
-        Args:
-            c: Tensor of coefficients for the objective function (shape: [N])
-            a: Tensor of coefficients for the linear constraint (shape: [N])
-            a0: Scalar constraint value
-            lr: Learning rate for gradient ascent
-            steps: Number of steps for optimization
-        
-        Returns:
-            t_opt: Optimized t values (shape: [N])
-            max_val: Maximum value of the objective function
-        """
-        # Detach learnable parameters
-        a = a.detach()
-        a0 = a0.detach()
-        c = c.detach()
+        Perform projected gradient ascent to maximize sum(c_i * a_i * t_i)
+        subject to the constraint: sum(a_i * t_i) = -a0, with t in [-1, 1]^N.
 
-        # Optimize t ∈ [-1, 1]^n
-        t = torch.zeros_like(a).requires_grad_(True)
+        Args:
+            c: Tensor of coefficients for the objective function (shape: [..., N] or broadcastable)
+            a: Tensor of coefficients for the linear constraint (shape: [..., N])
+            a0: Scalar or tensor matching batch dims of a (shape: [...] or scalar)
+            lr: Learning rate for gradient ascent
+            steps: Maximum number of optimization steps
+            tol: Tolerance for constraint violation and convergence
+
+        Returns:
+            max_val: Maximum value of the objective function (shape: [...])
+        """
+        c = torch.as_tensor(c, dtype=torch.float32).detach()
+        a = torch.as_tensor(a, dtype=torch.float32).detach()
+        a0 = torch.as_tensor(a0, dtype=torch.float32).detach()
+
+        assert a0.shape == a.shape[:-1] or a0.shape == (), "a0 must match batch dims of a or be scalar"
+
+        t = torch.zeros_like(a, requires_grad=True)
 
         for _ in range(steps):
-            constraint = 0.1*(torch.sum(a * t, dim=-1) + a0)
             B_t = torch.sum(c * a * t, dim=-1)
+            constraint =  torch.sum(a * t, dim=-1) + a0
+            loss = (-B_t + constraint).mean()
 
-            obj = -B_t
-            loss = (obj + constraint).mean()
-
-            loss.backward(retain_graph=True)
+            loss.backward()
             with torch.no_grad():
                 t -= lr * t.grad
                 t.clamp_(-1, 1)
                 t.grad.zero_()
 
-        return obj
+                # Check convergence
+                if torch.all(torch.abs(constraint) < tol) and torch.all(torch.abs(t.grad) < tol):
+                    break
+
+        max_val = torch.sum(c * a * t, dim=-1)
+
+        return max_val
     
     def softmax(self):
         x = self.coeffs[..., 0]
