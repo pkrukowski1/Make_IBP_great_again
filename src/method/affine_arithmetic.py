@@ -355,14 +355,13 @@ class AffineFunc:
     def to_interval(self, learnable_c=None):
         ones = torch.ones((*self.coeffs.shape[:-1], self.coeffs.shape[-1] - 1)).to(device=DEVICE)
         I = Interval(-ones, ones)
-        result = I * self.coeffs[..., 1:]
 
         if learnable_c is not None:
-            lb = torch.minimum(result.lower * learnable_c, result.upper * learnable_c)
-            ub = torch.maximum(result.lower * learnable_c, result.upper * learnable_c)
-            result.lower = torch.sum(lb, axis=-1) + self.coeffs[..., 0]
-            result.upper = torch.sum(ub, axis=-1) + self.coeffs[..., 0]
+            result = I * self.coeffs[..., 1:] * learnable_c
+            result.lower = torch.sum(result.lower, axis=-1) + self.coeffs[..., 0]
+            result.upper = torch.sum(result.upper, axis=-1) + self.coeffs[..., 0]
         else:
+            result = I * self.coeffs[..., 1:]
             result.lower = torch.sum(result.lower, axis=-1) + self.coeffs[..., 0]
             result.upper = torch.sum(result.upper, axis=-1) + self.coeffs[..., 0]
             
@@ -384,22 +383,29 @@ class AffineFunc:
         M = a0 + S
         B = 0.5 * e * M 
         
-        D = self.projected_gradient_ascent(
+        D_min = self.projected_gradient_descent(
             c=learnable_c.clone().requires_grad_(True),
             a=self.coeffs[..., 1:].clone(),
             a0=a0.clone()
         )
-        D = D-B
+        D_min = D_min - B
+
+        D_max = self.projected_gradient_ascent(
+            c=learnable_c.clone().requires_grad_(True),
+            a=self.coeffs[..., 1:].clone(),
+            a0=a0.clone()
+        )
+
+        D_max = D_max - B
 
         result = AffineFunc(shape=self.coeffs.shape, expr=self.expr)
         result.coeffs = learnable_c * self.coeffs
         result.coeffs[..., 0] = B
-        D = D[mask3]
-        e = e[mask3]
-        M = M[mask3]
+        D_min = D_min[mask3]
+        D_max = D_max[mask3]
         
-        i1 = Interval(-D, -D)
-        i2 = Interval((1-e)*M, (1-e)*M)
+        i1 = Interval(D_min, D_min)
+        i2 = Interval(D_max, D_max)
         hull_lower, hull_upper = interval_hull(i1, i2)
         
         error = (hull_upper - hull_lower).mean()
@@ -408,6 +414,31 @@ class AffineFunc:
         result.coeffs[mask2] = self.coeffs[mask2]
         result.add_var(Interval(hull_lower, hull_upper), mask3)
         return result, error
+    
+    def projected_gradient_descent(self, c, a, a0, lr=0.01, steps=5):
+        c = torch.as_tensor(c, dtype=torch.float32).detach()
+        a = torch.as_tensor(a, dtype=torch.float32).detach()
+        a0 = torch.as_tensor(a0, dtype=torch.float32).detach()
+
+        assert a0.shape == a.shape[:-1] or a0.shape == (), "a0 must match batch dims of a or be scalar"
+
+        t = torch.zeros_like(a, requires_grad=True)
+
+        for _ in range(steps):
+            A_t = torch.sum(a * t, dim=-1) + a0
+            relu_A_t = torch.relu(A_t)
+            B_t = torch.sum(c * a * t, dim=-1)
+            loss = (relu_A_t - B_t).mean()
+
+            loss.backward()
+            with torch.no_grad():
+                t -= lr * t.grad
+                t.clamp_(-1, 1)
+                t.grad.zero_()
+                
+        min_val = torch.sum(c * a * t, dim=-1)
+
+        return min_val
     
     def projected_gradient_ascent(self, c, a, a0, lr=0.01, steps=5):
         c = torch.as_tensor(c, dtype=torch.float32).detach()
@@ -419,14 +450,14 @@ class AffineFunc:
         t = torch.zeros_like(a, requires_grad=True)
 
         for _ in range(steps):
-            A_t = torch.sum(a * t, dim=-1)
+            A_t = torch.sum(a * t, dim=-1) + a0
             relu_A_t = torch.relu(A_t)
             B_t = torch.sum(c * a * t, dim=-1)
             loss = (relu_A_t - B_t).mean()
 
             loss.backward()
             with torch.no_grad():
-                t -= lr * t.grad
+                t += lr * t.grad
                 t.clamp_(-1, 1)
                 t.grad.zero_()
                 

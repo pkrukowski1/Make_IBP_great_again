@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - network: conv_small_mnist
+  - network: mlp
   - dataset: mnist
   - method: composer_lower_bound
   - exp: get_output_bounds
