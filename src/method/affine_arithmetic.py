@@ -382,7 +382,7 @@ class AffineFunc:
 
         M = a0 + S
         B = 0.5 * e * M
-        c = B/(S*learnable_c.squeeze(1))
+        c = B/S
         D = torch.abs(B-c*a0)
 
         result = AffineFunc(shape=self.coeffs.shape, expr=self.expr)
