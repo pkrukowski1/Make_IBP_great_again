@@ -187,11 +187,12 @@ class AffineNN(MethodPluginABC):
                             out_shape = self.module.layer_outputs.get(prev_layer)
                             slope = nn.Parameter(torch.log(0.5*torch.ones(out_shape)), requires_grad=True).to(DEVICE)
                             c_params = nn.Parameter(torch.ones(out_shape), requires_grad=True).to(DEVICE)
+                            c_params = c_params.unsqueeze(-1)
                         elif isinstance(prev_layer, nn.Linear):
                             slope = nn.Parameter(torch.log(0.5*torch.ones(prev_layer.out_features)), requires_grad=True).to(DEVICE)
                             c_params = nn.Parameter(torch.ones(prev_layer.out_features), requires_grad=True).to(DEVICE)
+                            c_params = c_params.unsqueeze(1)
                         self.slope_relu_params.append(slope)
-                        c_params = c_params.unsqueeze(1)
                         self.c_params.append(c_params)
 
             self.optimizer = torch.optim.Adam([*self.slope_relu_params, *self.c_params], lr=self.lr)
