@@ -25,10 +25,8 @@ class AffineNN(MethodPluginABC):
         optimize_bounds (bool): Flag indicating whether to optimize bounds using gradient-based methods.
         gradient_iter (int): Number of gradient iterations for optimizing bounds (required if optimize_bounds is True).
         lr (float): Learning rate for the optimizer used in bounds optimization.
-        lambda_valid (float): Coefficient for ensuring that the upper bound is greater than the lower bound.
-        lambda_worst_case (float): Coefficient for weighting the worst-case loss.
     Methods:
-        __init__(epsilon, optimize_bounds, gradient_iter=0, lr=0.1, lambda_valid=0.1, lambda_worst_case=10):
+        __init__(epsilon, optimize_bounds, gradient_iter=0, lr=0.1):
             Initializes the AffineNN object with the given parameters.
         get_bounds(x):
             Computes the affine arithmetic bounds for the input tensor `x` with perturbation `epsilon`.
@@ -43,12 +41,11 @@ class AffineNN(MethodPluginABC):
                 z_U (torch.Tensor): Upper bounds of the interval.
             Returns:
                 torch.Tensor: The computed loss for interval tightening.
-        _gradient_step(x, y):
+        _gradient_step(x):
             Performs a single gradient step to optimize the bounds using the input tensor 
             and target labels.
             Args:
                 x (torch.Tensor): Input tensor.
-                y (torch.Tensor): Target labels.
         forward(x, y):
             Computes the forward pass of the AffineNN method. If `optimize_bounds` is True, 
             performs gradient-based optimization to tighten bounds.
@@ -63,8 +60,6 @@ class AffineNN(MethodPluginABC):
                  optimize_bounds: bool, 
                  gradient_iter: int = 0,
                  lr: float = 0.1,
-                 lambda_valid: float = 0.1,
-                 lambda_worst_case: float = 10.0
                  ):
         
         super().__init__()
@@ -76,8 +71,6 @@ class AffineNN(MethodPluginABC):
             raise ValueError("Gradient iteration must be greater than 0 when optimize_bounds is True.")
         
         self.gradient_iter = gradient_iter
-        self.lambda_valid = lambda_valid
-        self.lambda_worst_case = lambda_worst_case
         self.lr = lr
 
         log.info(f"Initialized Affine Arithmetic object with optimize_bounds={optimize_bounds}")
@@ -136,25 +129,19 @@ class AffineNN(MethodPluginABC):
             z_L (torch.Tensor): The lower bounds of the intervals.
             z_U (torch.Tensor): The upper bounds of the intervals.
         Returns:
-            torch.Tensor: The computed loss value, which is a combination of:
-                - Interval width minimization loss.
-                - Validity constraint loss ensuring lower bounds are less than or equal to upper bounds.
+            torch.Tensor: The computed loss value.
         """
 
         # Minimize interval width
         loss_tight = torch.mean(z_U - z_L)
-
-        # Ensure lower bound <= upper bound
-        loss_valid = self.lambda_valid * torch.mean(torch.clamp(z_L - z_U, min=0))
         
-        return loss_tight + loss_valid
+        return loss_tight
     
-    def _gradient_step(self, x, y):
+    def _gradient_step(self, x):
         """
         Performs a single gradient descent step for optimizing the model.
         Args:
             x (torch.Tensor): Input tensor for the model.
-            y (torch.Tensor): Ground truth labels for the input data.
         Returns:
             None
         Description:
@@ -166,14 +153,8 @@ class AffineNN(MethodPluginABC):
         """
         outputs, relu_loss = self.get_bounds(x)
         loss = self.tighten_up_intervals(outputs.lower, outputs.upper)
-        
-        lb = outputs.lower.unsqueeze(0)
-        ub = outputs.upper.unsqueeze(0)
 
-        tmp = nn.functional.one_hot(y, lb.size(-1))
-        z = torch.where(tmp.bool(), lb, ub)
-        loss_cls = self.criterion(z, y)
-        total_loss = self.lambda_worst_case * loss_cls + relu_loss + loss
+        total_loss = relu_loss + loss
 
         self.optimizer.zero_grad()
         total_loss.backward()
@@ -217,7 +198,7 @@ class AffineNN(MethodPluginABC):
             self.criterion = nn.CrossEntropyLoss()
 
             for _ in range(self.gradient_iter):            
-                self._gradient_step(x, y)
+                self._gradient_step(x)
         outputs, _ = self.get_bounds(x)
            
         return outputs

@@ -7,5 +7,3 @@ plugins:
     optimize_bounds: True
     gradient_iter: 100
     lr: 0.1
-    lambda_valid: 1.0
-    lambda_worst_case: 10.0
