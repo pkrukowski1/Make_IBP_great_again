@@ -381,8 +381,8 @@ class AffineFunc:
         S = torch.sum(torch.abs(self.coeffs[..., 1:]), axis=-1)
 
         M = a0 + S
-        B = 0.5 * e * M * learnable_c.squeeze(1)
-        c = B/S
+        B = 0.5 * e * M
+        c = B/(S*learnable_c.squeeze(1))
         D = torch.abs(B-c*a0)
 
         result = AffineFunc(shape=self.coeffs.shape, expr=self.expr)
