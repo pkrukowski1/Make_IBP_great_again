@@ -25,10 +25,8 @@ class AffineNN(MethodPluginABC):
         optimize_bounds (bool): Flag indicating whether to optimize bounds using gradient-based methods.
         gradient_iter (int): Number of gradient iterations for optimizing bounds (required if optimize_bounds is True).
         lr (float): Learning rate for the optimizer used in bounds optimization.
-        lambda_valid (float): Coefficient for ensuring that the upper bound is greater than the lower bound.
-        lambda_worst_case (float): Coefficient for weighting the worst-case loss.
     Methods:
-        __init__(epsilon, optimize_bounds, gradient_iter=0, lr=0.1, lambda_valid=0.1, lambda_worst_case=10):
+        __init__(epsilon, optimize_bounds, gradient_iter=0, lr=0.1):
             Initializes the AffineNN object with the given parameters.
         get_bounds(x):
             Computes the affine arithmetic bounds for the input tensor `x` with perturbation `epsilon`.
@@ -43,12 +41,11 @@ class AffineNN(MethodPluginABC):
                 z_U (torch.Tensor): Upper bounds of the interval.
             Returns:
                 torch.Tensor: The computed loss for interval tightening.
-        _gradient_step(x, y):
+        _gradient_step(x):
             Performs a single gradient step to optimize the bounds using the input tensor 
             and target labels.
             Args:
                 x (torch.Tensor): Input tensor.
-                y (torch.Tensor): Target labels.
         forward(x, y):
             Computes the forward pass of the AffineNN method. If `optimize_bounds` is True, 
             performs gradient-based optimization to tighten bounds.
@@ -63,8 +60,6 @@ class AffineNN(MethodPluginABC):
                  optimize_bounds: bool, 
                  gradient_iter: int = 0,
                  lr: float = 0.1,
-                 lambda_valid: float = 0.1,
-                 lambda_worst_case: float = 10.0
                  ):
         
         super().__init__()
@@ -76,8 +71,6 @@ class AffineNN(MethodPluginABC):
             raise ValueError("Gradient iteration must be greater than 0 when optimize_bounds is True.")
         
         self.gradient_iter = gradient_iter
-        self.lambda_valid = lambda_valid
-        self.lambda_worst_case = lambda_worst_case
         self.lr = lr
 
         log.info(f"Initialized Affine Arithmetic object with optimize_bounds={optimize_bounds}")
@@ -119,7 +112,10 @@ class AffineNN(MethodPluginABC):
                 elif isinstance(layer, nn.ReLU):
                     if self.optimize_bounds:
                         slope = self.slope_relu_params[relu_param_idx]
-                        affine_func, error = affine_func.relu(slope)
+                        c_params = self.c_params[relu_param_idx]
+
+                        affine_func, error = affine_func.relu(slope, c_params)
+
                         relu_loss += (idx_layer+1)*error
                         relu_param_idx += 1
                 elif isinstance(layer, nn.Flatten):
@@ -133,25 +129,19 @@ class AffineNN(MethodPluginABC):
             z_L (torch.Tensor): The lower bounds of the intervals.
             z_U (torch.Tensor): The upper bounds of the intervals.
         Returns:
-            torch.Tensor: The computed loss value, which is a combination of:
-                - Interval width minimization loss.
-                - Validity constraint loss ensuring lower bounds are less than or equal to upper bounds.
+            torch.Tensor: The computed loss value.
         """
 
         # Minimize interval width
         loss_tight = torch.mean(z_U - z_L)
-
-        # Ensure lower bound <= upper bound
-        loss_valid = self.lambda_valid * torch.mean(torch.clamp(z_L - z_U, min=0))
         
-        return loss_tight + loss_valid
+        return loss_tight
     
-    def _gradient_step(self, x, y):
+    def _gradient_step(self, x):
         """
         Performs a single gradient descent step for optimizing the model.
         Args:
             x (torch.Tensor): Input tensor for the model.
-            y (torch.Tensor): Ground truth labels for the input data.
         Returns:
             None
         Description:
@@ -163,14 +153,8 @@ class AffineNN(MethodPluginABC):
         """
         outputs, relu_loss = self.get_bounds(x)
         loss = self.tighten_up_intervals(outputs.lower, outputs.upper)
-        
-        lb = outputs.lower.unsqueeze(0)
-        ub = outputs.upper.unsqueeze(0)
 
-        tmp = nn.functional.one_hot(y, lb.size(-1))
-        z = torch.where(tmp.bool(), lb, ub)
-        loss_cls = self.criterion(z, y)
-        total_loss = self.lambda_worst_case * loss_cls + relu_loss + loss
+        total_loss = relu_loss + loss
 
         self.optimizer.zero_grad()
         total_loss.backward()
@@ -194,6 +178,7 @@ class AffineNN(MethodPluginABC):
 
         if self.optimize_bounds:
             self.slope_relu_params = nn.ParameterList()
+            self.c_params = nn.ParameterList()
             for m in self.module.module.children():
                 for idx, layer in enumerate(m):
                     if isinstance(layer, nn.ReLU):
@@ -201,15 +186,19 @@ class AffineNN(MethodPluginABC):
                         if isinstance(prev_layer, nn.Conv2d):
                             out_shape = self.module.layer_outputs.get(prev_layer)
                             slope = nn.Parameter(torch.log(0.5*torch.ones(out_shape)), requires_grad=True).to(DEVICE)
+                            c_params = nn.Parameter(torch.ones(out_shape), requires_grad=True).to(DEVICE)
                         elif isinstance(prev_layer, nn.Linear):
                             slope = nn.Parameter(torch.log(0.5*torch.ones(prev_layer.out_features)), requires_grad=True).to(DEVICE)
+                            c_params = nn.Parameter(torch.ones(prev_layer.out_features), requires_grad=True).to(DEVICE)
                         self.slope_relu_params.append(slope)
+                        c_params = c_params.unsqueeze(1)
+                        self.c_params.append(c_params)
 
-            self.optimizer = torch.optim.Adam([*self.slope_relu_params], lr=self.lr)
+            self.optimizer = torch.optim.Adam([*self.slope_relu_params, *self.c_params], lr=self.lr)
             self.criterion = nn.CrossEntropyLoss()
 
             for _ in range(self.gradient_iter):            
-                self._gradient_step(x, y)
+                self._gradient_step(x)
         outputs, _ = self.get_bounds(x)
            
         return outputs
@@ -344,17 +333,24 @@ class AffineFunc:
     def __rmul__(self, other):
         return self * other
         
-    def to_interval(self):
+    def to_interval(self, learnable_c=None):
         ones = torch.ones((*self.coeffs.shape[:-1], self.coeffs.shape[-1] - 1)).to(device=DEVICE)
         I = Interval(-ones, ones)
-        result = I * self.coeffs[..., 1:]
-        result.lower = torch.sum(result.lower, axis=-1) + self.coeffs[..., 0]
-        result.upper = torch.sum(result.upper, axis=-1) + self.coeffs[..., 0]
-        
-        return result
 
-    def relu(self, slope):
-        c = self.to_interval()
+        if learnable_c is not None:
+            result = I * self.coeffs[..., 1:] * learnable_c
+            result.lower = torch.sum(result.lower, axis=-1) + self.coeffs[..., 0]
+            result.upper = torch.sum(result.upper, axis=-1) + self.coeffs[..., 0]
+        else:
+            result = I * self.coeffs[..., 1:]
+            result.lower = torch.sum(result.lower, axis=-1) + self.coeffs[..., 0]
+            result.upper = torch.sum(result.upper, axis=-1) + self.coeffs[..., 0]
+            
+        return result
+    
+
+    def relu(self, slope, learnable_c):
+        c = self.to_interval(learnable_c)
 
         mask1 = c <= 0
         mask2 = c >= 0
@@ -371,7 +367,7 @@ class AffineFunc:
         D = torch.abs(B-c*a0)
 
         result = AffineFunc(shape=self.coeffs.shape, expr=self.expr)
-        result.coeffs = c.unsqueeze(-1) * self.coeffs
+        result.coeffs = learnable_c * self.coeffs
         result.coeffs[..., 0] = B
         D = D[mask3]
         e = e[mask3]
@@ -387,6 +383,7 @@ class AffineFunc:
         result.coeffs[mask2] = self.coeffs[mask2]
         result.add_var(Interval(hull_lower, hull_upper), mask3)
         return result, error
+    
     
     def softmax(self):
         x = self.coeffs[..., 0]

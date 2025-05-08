@@ -3,7 +3,7 @@ defaults:
   - network: mlp
   - dataset: mnist
   - method: composer_affine_arithmetic
-  - exp: salt_and_pepper
+  - exp: get_output_bounds
 
 fabric:
   _target_: lightning.Fabric

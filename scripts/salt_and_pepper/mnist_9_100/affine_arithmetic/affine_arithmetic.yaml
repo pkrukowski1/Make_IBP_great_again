@@ -36,8 +36,8 @@ method:
       optimize_bounds: True
       gradient_iter: 100
       lr: 0.1
-      lambda_valid: 0.1
-      lambda_worst_case: 10.0
+      
+      
 
 dataset:
   _target_: torch.utils.data.DataLoader
