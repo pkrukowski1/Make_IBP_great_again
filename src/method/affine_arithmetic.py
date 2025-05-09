@@ -377,7 +377,7 @@ class AffineFunc:
         M = M[mask3]
 
         i1 = Interval(-D, -D)
-        i2 = Interval(-(1-tau).abs()*M, -(1-tau).abs()*M)
+        i2 = Interval((1-tau)*M, (1-tau)*M)
         hull_lower, hull_upper = interval_hull(i1, i2)
         
         error = (hull_upper - hull_lower).mean()
