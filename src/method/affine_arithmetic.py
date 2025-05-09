@@ -352,31 +352,32 @@ class AffineFunc:
     
 
     def relu(self, slope, learnable_c):
-        c = self.to_interval(learnable_c)
+        c = self.to_interval()
 
         mask1 = c <= 0
         mask2 = c >= 0
         mask3 = torch.logical_not(torch.logical_or(mask1, mask2))
     
-        e = torch.exp(slope.unsqueeze(0)).squeeze(0)
-
         a0 = self.coeffs[..., 0]
         S = torch.sum(torch.abs(self.coeffs[..., 1:]), axis=-1)
 
+        learnable_c = torch.relu(learnable_c)
+
         M = a0 + S
-        B = 0.5 * e * M
-        c = B/S
-        D = torch.abs(B-c*a0)
+        tau = 2 * learnable_c.squeeze(1) * S / M
+        B = 0.5 * tau * M
+        D = torch.abs(B-learnable_c.squeeze(1)*a0)
+
 
         result = AffineFunc(shape=self.coeffs.shape, expr=self.expr)
         result.coeffs = learnable_c * self.coeffs
         result.coeffs[..., 0] = B
         D = D[mask3]
-        e = e[mask3]
+        tau = tau[mask3]
         M = M[mask3]
-        
+
         i1 = Interval(-D, -D)
-        i2 = Interval((1-e)*M, (1-e)*M)
+        i2 = Interval(-(1-tau).abs()*M, -(1-tau).abs()*M)
         hull_lower, hull_upper = interval_hull(i1, i2)
         
         error = (hull_upper - hull_lower).mean()
