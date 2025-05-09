@@ -111,9 +111,10 @@ class AffineNN(MethodPluginABC):
                     affine_func = affine_func.linear(layer)
                 elif isinstance(layer, nn.ReLU):
                     if self.optimize_bounds:
+                        slope = self.slope_relu_params[relu_param_idx]
                         c_params = self.c_params[relu_param_idx]
 
-                        affine_func, error = affine_func.relu(c_params)
+                        affine_func, error = affine_func.relu(slope, c_params)
 
                         relu_loss += (idx_layer+1)*error
                         relu_param_idx += 1
@@ -176,6 +177,7 @@ class AffineNN(MethodPluginABC):
         """
 
         if self.optimize_bounds:
+            self.slope_relu_params = nn.ParameterList()
             self.c_params = nn.ParameterList()
             for m in self.module.module.children():
                 for idx, layer in enumerate(m):
@@ -183,15 +185,18 @@ class AffineNN(MethodPluginABC):
                         prev_layer = m[idx-1]
                         if isinstance(prev_layer, nn.Conv2d):
                             out_shape = self.module.layer_outputs.get(prev_layer)
+                            slope = nn.Parameter(torch.log(0.5*torch.ones(out_shape)), requires_grad=True).to(DEVICE)
                             c_params = nn.Parameter(torch.ones(out_shape), requires_grad=True).to(DEVICE)
                             c_params = c_params.unsqueeze(-1)
 
                         elif isinstance(prev_layer, nn.Linear):
+                            slope = nn.Parameter(torch.log(0.5*torch.ones(prev_layer.out_features)), requires_grad=True).to(DEVICE)
                             c_params = nn.Parameter(torch.ones(prev_layer.out_features), requires_grad=True).to(DEVICE)
                             c_params = c_params.unsqueeze(1)
+                        self.slope_relu_params.append(slope)
                         self.c_params.append(c_params)
 
-            self.optimizer = torch.optim.Adam([*self.c_params], lr=self.lr)
+            self.optimizer = torch.optim.Adam([*self.slope_relu_params, *self.c_params], lr=self.lr)
             self.criterion = nn.CrossEntropyLoss()
 
             for _ in range(self.gradient_iter):            
@@ -230,8 +235,8 @@ class AffineFunc:
             Implements reverse multiplication for scalar * AffineFunc.
         to_interval() -> Interval:
             Converts the affine function to an interval representation.
-        relu(c_params):
-            Applies the ReLU activation function to the affine function with a given `c_params`.
+        relu(slope):
+            Applies the ReLU activation function to the affine function with a given slope.
         softmax():
             Applies the softmax function to the affine function and computes its interval representation.
         conv2d(conv_layer: nn.Conv2d) -> 'AffineFunc':
@@ -346,17 +351,14 @@ class AffineFunc:
         return result
     
 
-    def relu(self, learnable_c):
+    def relu(self, slope, learnable_c):
         c = self.to_interval(learnable_c)
 
         mask1 = c <= 0
         mask2 = c >= 0
         mask3 = torch.logical_not(torch.logical_or(mask1, mask2))
     
-        e = c.upper / c.diam()
-
-        e = 0.5*(1 - torch.cos(torch.pi*e))
-        e = 0.5*(1 - torch.cos(torch.pi*e))
+        e = torch.exp(slope.unsqueeze(0)).squeeze(0)
 
         a0 = self.coeffs[..., 0]
         S = torch.sum(torch.abs(self.coeffs[..., 1:]), axis=-1)
