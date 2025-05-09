@@ -1,16 +1,13 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.utils import save_image
 import torchvision.transforms as transforms
 
 import os
 import uuid
-from typing import Union
+from typing import Tuple
 
 from method.interval_arithmetic import Interval
-from dataset.mnist import MNIST
-from dataset.cifar10 import CIFAR10
-from dataset.svhn import SVHN
 from method.method_plugin_abc import MethodPluginABC
 
 from omegaconf import DictConfig
@@ -32,7 +29,7 @@ def get_dataloader(config: DictConfig, fabric) -> torch.utils.data.DataLoader:
     """
     return fabric.setup_dataloaders(instantiate(config.dataset))
 
-def verify_point(output_bounds: Interval, label: torch.Tensor) -> float:
+def verify_point(output_bounds: Interval, y_pred, y_gt: torch.Tensor) -> float:
     """
     Verifies whether the predicted label for a given point is robustly classified
     based on the provided output bounds.
@@ -40,15 +37,14 @@ def verify_point(output_bounds: Interval, label: torch.Tensor) -> float:
         output_bounds (Interval): An object representing the interval bounds of the
             model's output logits. It should provide methods to access the midpoint,
             lower bounds, and upper bounds of the logits.
-        label (torch.Tensor): A tensor containing the ground truth label for the
+        y_pred (torch.Tensor): A tensor containing the predicted label for the
+            input point.
+        y_gt (torch.Tensor): A tensor containing the ground truth label for the
             input point.
     Returns:
         float: A verification result where 1.0 indicates that the point is verified.
     """
     with torch.no_grad():
-        logits = output_bounds.midpoint()
-        preds = F.softmax(logits, dim=-1)
-        y_pred = torch.argmax(preds, dim=-1)
 
         lower_bound = output_bounds.lower
         upper_bound = output_bounds.upper
@@ -56,8 +52,8 @@ def verify_point(output_bounds: Interval, label: torch.Tensor) -> float:
         lower_bound = squeeze_batch_dim(lower_bound)
         upper_bound = squeeze_batch_dim(upper_bound)
         verified = None
-
-        if y_pred == label:
+        
+        if y_pred == y_gt:
             verified = 0.0
             lower_bound_gt = lower_bound[y_pred]
             upper_bound_non_gt = upper_bound[torch.arange(upper_bound.size(0), device=upper_bound.device) != y_pred]
@@ -65,6 +61,25 @@ def verify_point(output_bounds: Interval, label: torch.Tensor) -> float:
                 verified = 1.0
 
         return verified
+    
+def check_correct_prediction(module: nn.Module, x: torch.Tensor, y_gt: torch.Tensor) -> Tuple[bool,torch.Tensor]:
+    """
+    Checks whether a given neural network module correctly classifies an input tensor.
+    Args:
+        module (nn.Module): The neural network module to evaluate.
+        x (torch.Tensor): The input tensor to be classified by the module.
+        y_gt (torch.Tensor): The ground truth tensor representing the correct classification.
+    Returns: Tuple
+        bool: True if the module's prediction matches the ground truth, False otherwise.
+        torch.tensor: 
+    """
+    y_pred = module(x)
+    y_pred = torch.argmax(y_pred, dim=-1)
+    correctly_classified = False
+    if y_pred == y_gt:
+        correctly_classified = True
+    
+    return correctly_classified, y_pred
     
 def add_salt_and_pepper(x: torch.Tensor, amount: float = 0.02, salt_vs_pepper: float = 0.5) -> torch.Tensor:
     """
