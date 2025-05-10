@@ -42,45 +42,44 @@ def run(config: DictConfig):
         X = fabric.to_device(X)
         y = fabric.to_device(y)
         
-        correctly_predicted, y_pred = check_correct_prediction(method.module, X, y)
+        _, y_pred = check_correct_prediction(method.module, X, y)
 
-        if correctly_predicted:
-            start_time = time.time()
-            
-            int_output_bounds = method.forward(X, y)
-            log.info(f"Batch {batch_idx+1}, Output Bounds: {int_output_bounds}")
-            
-            # Calculate processing time
-            batch_time = time.time() - start_time
-            batch_size = X.size(0)
-            avg_time_per_image = batch_time / batch_size
-            processing_times.append(avg_time_per_image)
-            
-            # Convert output_bounds to numpy for logging/saving
-            lb = int_output_bounds.lower
-            ub = int_output_bounds.upper
-            
-            # Calculate metrics
-            output_bounds_length = torch.max(ub - lb, dim=-1).values.item()
-            verified = verify_point(int_output_bounds, y_pred, y)
-            print(f"Batch {batch_idx+1}, Verified: {verified}")
-            verified_points.extend([] if verified is None else [verified])
-            
-            # Log to wandb
-            wandb.log({
-                "batch_idx": batch_idx,
-                "output_bounds_length": output_bounds_length,
-                "avg_processing_time_per_image": avg_time_per_image,
-                "correctly_verified_point": verified,
-                "batch_size": batch_size
-            })
-            
-            # Collect batch metrics
-            batch_results.append({
-                "batch_idx": batch_idx,
-                "output_bounds_length": output_bounds_length,
-                "verified_point": verified,
-                "avg_time_per_image": avg_time_per_image
+        start_time = time.time()
+        
+        int_output_bounds = method.forward(X, y)
+        log.info(f"Batch {batch_idx+1}, Output Bounds: {int_output_bounds}")
+        
+        # Calculate processing time
+        batch_time = time.time() - start_time
+        batch_size = X.size(0)
+        avg_time_per_image = batch_time / batch_size
+        processing_times.append(avg_time_per_image)
+        
+        # Convert output_bounds to numpy for logging/saving
+        lb = int_output_bounds.lower
+        ub = int_output_bounds.upper
+        
+        # Calculate metrics
+        output_bounds_length = torch.max(ub - lb, dim=-1).values.item()
+        verified = verify_point(int_output_bounds, y_pred, y)
+        print(f"Batch {batch_idx+1}, Verified: {verified}")
+        verified_points.extend([] if verified is None else [verified])
+        
+        # Log to wandb
+        wandb.log({
+            "batch_idx": batch_idx,
+            "output_bounds_length": output_bounds_length,
+            "avg_processing_time_per_image": avg_time_per_image,
+            "correctly_verified_point": verified,
+            "batch_size": batch_size
+        })
+        
+        # Collect batch metrics
+        batch_results.append({
+            "batch_idx": batch_idx,
+            "output_bounds_length": output_bounds_length,
+            "verified_point": verified,
+            "avg_time_per_image": avg_time_per_image
             })
             
     # Calculate overall metrics

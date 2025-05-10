@@ -29,7 +29,7 @@ def get_dataloader(config: DictConfig, fabric) -> torch.utils.data.DataLoader:
     """
     return fabric.setup_dataloaders(instantiate(config.dataset))
 
-def verify_point(output_bounds: Interval, y_pred, y_gt: torch.Tensor) -> float:
+def verify_point(output_bounds: Interval, y_pred: torch.Tensor, y_gt: torch.Tensor) -> float:
     """
     Verifies whether the predicted label for a given point is robustly classified
     based on the provided output bounds.

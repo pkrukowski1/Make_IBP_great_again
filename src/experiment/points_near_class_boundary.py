@@ -11,7 +11,7 @@ from hydra.utils import instantiate
 from tqdm import tqdm
 from utils.fabric import setup_fabric
 from utils.hydra import extract_output_dir
-from experiment.utils import get_dataloader, verify_point, generate_boundary_points, save_deteriotated_image
+from experiment.utils import get_dataloader, verify_point, generate_boundary_points, save_deteriotated_image, check_correct_prediction
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -43,6 +43,9 @@ def run(config: DictConfig):
     for batch_idx, (X, y) in enumerate(tqdm(dataloader, desc="Processing batches")):
         X = fabric.to_device(X)
         y = fabric.to_device(y)
+
+        _, y_pred = check_correct_prediction(method.module, X, y)
+
         start_time = time.time()
         
         int_output_bounds = method.forward(X, y)
@@ -77,7 +80,7 @@ def run(config: DictConfig):
         
         # Calculate metrics
         output_bounds_length = torch.max(ub - lb, dim=-1).values.item()
-        verified = verify_point(int_output_bounds, y)
+        verified = verify_point(int_output_bounds, y_pred, y)
         print(f"Batch {batch_idx+1}, Verified: {verified}")
         verified_points.extend([] if verified is None else [verified])
         
