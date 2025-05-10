@@ -36,6 +36,6 @@ dataset:
     data_path: ${oc.env:DATA_DIR}/cifar10
     train: false
     flatten: false
-    no_points: 1000
+    no_points: 50
   batch_size: 1
 
