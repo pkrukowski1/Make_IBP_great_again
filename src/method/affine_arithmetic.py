@@ -1,4 +1,3 @@
-import numpy as torch
 import logging
 import math
 
