@@ -356,7 +356,7 @@ class AffineFunc:
         D = torch.abs(B-c*a0)
 
         result = AffineFunc(shape=self.coeffs.shape, expr=self.expr)
-        result.coeffs = c.unsqueeze(1) * self.coeffs
+        result.coeffs = c.unsqueeze(-1) * self.coeffs
         result.coeffs[..., 0] = B
         D = D[mask3]
         e = e[mask3]
