@@ -150,9 +150,17 @@ class AffineNN(MethodPluginABC):
             then used to perform a gradient descent step to minimize the total loss.
         """
         outputs, relu_loss = self.get_bounds(x)
-        loss = self.tighten_up_intervals(outputs.lower, outputs.upper)
+        lb, ub = outputs.lower, outputs.upper
+        loss = self.tighten_up_intervals(lb, ub)
 
-        total_loss = relu_loss + loss
+        # Worst case loss
+        y_pred = torch.argmax(self.module(x), dim=-1)
+        tmp = nn.functional.one_hot(y_pred, lb.size(-1))
+        z = torch.where(tmp.bool(), lb, ub)
+        loss_cls = self.criterion(z, y_pred)
+
+
+        total_loss = relu_loss + loss + 10*loss_cls
 
         self.optimizer.zero_grad()
         total_loss.backward()
