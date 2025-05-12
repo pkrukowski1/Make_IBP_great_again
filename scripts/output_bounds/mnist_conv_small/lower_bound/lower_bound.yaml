@@ -5,25 +5,6 @@ exp:
   seed: 1
   log_dir: # set during runtime to automatically created dir
   run_func: 
-    _target_: experiment.get_output_bounds
-
-fabric:
-  _target_: lightning.Fabric
-  num_nodes: 1
-  devices: 1
-  accelerator: gpu
-
-wandb:
-  entity: ${oc.env:WANDB_ENTITY}
-  project: ${oc.env:WANDB_PROJECT}
-
-defaults:
-  - _self_
-
-exp:
-  seed: 1
-  log_dir: # set during runtime to automatically created dir
-  run_func: 
     _target_: experiment.run_get_output_bounds
 
 fabric:
