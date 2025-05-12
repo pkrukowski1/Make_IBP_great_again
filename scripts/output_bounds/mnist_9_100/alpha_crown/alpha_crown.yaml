@@ -1,0 +1,45 @@
+defaults:
+  - _self_
+
+exp:
+  seed: 1
+  log_dir: # set during runtime to automatically created dir
+  run_func: 
+    _target_: experiment.run_get_output_bounds
+
+fabric:
+  _target_: lightning.Fabric
+  num_nodes: 1
+  devices: 1
+  accelerator: gpu
+
+wandb:
+  entity: ${oc.env:WANDB_ENTITY}
+  project: ${oc.env:WANDB_PROJECT}
+
+network:
+  _target_: network.MLP
+  activation_fnc:
+    _target_: torch.nn.ReLU
+  layers: [784,100,100,100,100,100,100,100,100,10]
+  model_path: ${oc.env:MODEL_DIR}/mnist_9_100_nat.pth
+
+method:
+  _partial_: True
+  _target_: method.Composer
+  plugins:
+    - _target_: method.AlphaCROWN
+      epsilon: 0.026
+      lr: 0.1
+      gradient_iter: 1000
+
+dataset:
+  _target_: torch.utils.data.DataLoader
+  dataset:
+    _target_: dataset.MNIST
+    data_path: ${oc.env:DATA_DIR}/mnist
+    train: false
+    flatten: true
+    no_points: 1000
+  batch_size: 1
+
