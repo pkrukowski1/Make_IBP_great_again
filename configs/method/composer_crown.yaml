@@ -1,0 +1,6 @@
+_partial_: True
+_target_: method.Composer
+
+plugins:
+  - _target_: method.CROWN
+    epsilon: 0.01
