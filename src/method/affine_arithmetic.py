@@ -1,5 +1,4 @@
 import logging
-import math
 
 from method.interval_arithmetic import Interval, interval_hull, intersection
 from method.method_plugin_abc import MethodPluginABC
