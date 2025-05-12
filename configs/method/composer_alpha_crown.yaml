@@ -1,0 +1,8 @@
+_partial_: True
+_target_: method.Composer
+
+plugins:
+  - _target_: method.AlphaCROWN
+    epsilon: 0.01
+    gradient_iter: 100
+    lr: 0.1
