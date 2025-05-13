@@ -66,7 +66,7 @@ class AlphaCROWN(MethodPluginABC):
 
         log.info(f"AlphaCROWN plugin initialized for epsilon={self.epsilon}")
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor) -> Interval:
+    def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
         """
         Perform a forward pass through the model with Alpha-CROWN.
 
@@ -87,7 +87,8 @@ class AlphaCROWN(MethodPluginABC):
               options for bound computation.
             - The bounds are computed using the specified method (`self._method`).
         """
-        ptb = PerturbationLpNorm(norm = self._norm, eps = self.epsilon)
+        epsilon = eps * self.epsilon
+        ptb = PerturbationLpNorm(norm = self._norm, eps = epsilon)
         x = BoundedTensor(x, ptb)
 
         if self.lirpa_model is None:

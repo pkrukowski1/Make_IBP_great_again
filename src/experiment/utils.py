@@ -201,3 +201,28 @@ def generate_boundary_points(method: MethodPluginABC, X: torch.Tensor, y: torch.
         X_adv = X_adv.detach()
 
     return X_adv
+
+def get_eps(config: DictConfig, eps: torch.Tensor) -> torch.Tensor:
+    """
+    Adjusts the epsilon tensor by dividing it by the dataset's standard deviation
+    if the standard deviation is defined in the dataset configuration.
+
+    Args:
+        config (DictConfig): The configuration object containing dataset information.
+            It is expected to have a nested structure where `config.dataset.dataset.std`
+            holds the standard deviation values as a list or tensor.
+        eps (torch.Tensor): The epsilon tensor to be adjusted. Typically represents
+            perturbation bounds in adversarial training or similar contexts.
+
+    Returns:
+        torch.Tensor: The adjusted epsilon tensor. If the dataset's standard deviation
+            is defined, the epsilon tensor is divided by it. Otherwise, the original
+            epsilon tensor is returned unchanged.
+    """
+    if hasattr(config.dataset.dataset, "std"):
+        std = config.dataset.dataset.std
+        std = torch.tensor(std, device=eps.device).view(1, 3, 1, 1)
+        eps = eps / std
+    return eps
+
+    

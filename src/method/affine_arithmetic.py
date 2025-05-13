@@ -74,7 +74,7 @@ class AffineNN(MethodPluginABC):
         log.info(f"Initialized Affine Arithmetic object with optimize_bounds={optimize_bounds}")
 
         
-    def get_bounds(self, x: torch.Tensor) -> Interval:
+    def get_bounds(self, x: torch.Tensor, eps: torch.Tensor) -> Interval:
         """
         Computes the bounds of an affine arithmetic expression through a neural network.
         This method propagates an affine expression through the layers of a neural network
@@ -91,8 +91,9 @@ class AffineNN(MethodPluginABC):
         """
         # WARNING: This method assumes that the input x is a single batch of data.
         # If x is a batch, we need to squeeze it to get the first element.
-        x = x.squeeze(0)
-        epsilon = self.epsilon * torch.ones_like(x)
+        x = x.squeeze(0).squeeze(0)
+        epsilon = self.epsilon * eps
+        epsilon = epsilon.squeeze(0).squeeze(0)
         zl, zu = x - epsilon, x + epsilon
         expr = AffineExpr()
         interval = Interval(zl, zu)
@@ -134,7 +135,7 @@ class AffineNN(MethodPluginABC):
         
         return loss_tight
     
-    def _gradient_step(self, x):
+    def _gradient_step(self, x, eps):
         """
         Performs a single gradient descent step for optimizing the model.
         Args:
@@ -148,7 +149,7 @@ class AffineNN(MethodPluginABC):
             total loss is computed as the sum of these two losses. The optimizer is
             then used to perform a gradient descent step to minimize the total loss.
         """
-        outputs, relu_loss = self.get_bounds(x)
+        outputs, relu_loss = self.get_bounds(x,eps)
         lb, ub = outputs.lower, outputs.upper
         loss = self.tighten_up_intervals(lb, ub)
 
@@ -165,7 +166,7 @@ class AffineNN(MethodPluginABC):
         total_loss.backward()
         self.optimizer.step()
     
-    def forward(self, x, y):
+    def forward(self, x, y, eps: torch.Tensor):
         """
         Performs the forward pass for affine arithmetic calculations.
         Args:
@@ -199,8 +200,8 @@ class AffineNN(MethodPluginABC):
             self.criterion = nn.CrossEntropyLoss()
 
             for _ in range(self.gradient_iter):            
-                self._gradient_step(x)
-        outputs, _ = self.get_bounds(x)
+                self._gradient_step(x,eps)
+        outputs, _ = self.get_bounds(x,eps)
            
         return outputs
 

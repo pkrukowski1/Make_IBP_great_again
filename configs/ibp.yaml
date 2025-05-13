@@ -3,7 +3,7 @@ defaults:
   - network: mlp
   - dataset: mnist
   - method: composer_ibp
-  - exp: points_near_class_boundary
+  - exp: get_output_bounds
 
 fabric:
   _target_: lightning.Fabric

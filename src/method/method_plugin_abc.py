@@ -11,7 +11,7 @@ class MethodPluginABC(metaclass=ABCMeta):
     Methods:
         set_module(module: nn.Module):
             Sets the neural network module for the plugin to operate on.
-        forward(x, epsilon, y):
+        forward(x,y,eps):
             Abstract method that defines the internal forward pass logic. 
             Must be implemented by subclasses.
     Attributes:
@@ -29,7 +29,7 @@ class MethodPluginABC(metaclass=ABCMeta):
         self.module = module
 
     @abstractmethod
-    def forward(self, x, y) -> None:
+    def forward(self, x, y, eps) -> None:
         """
         Internal forward pass.
         """

@@ -39,19 +39,20 @@ class Composer:
             log.info(f'Plugin {plugin.__class__.__name__} added to composer')
 
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor) -> Interval:
+    def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
         """
         Forward pass through the module and plugins.
         
         Args:
             x (torch.Tensor): Input tensor.
             y (torch.Tensor): Target tensor.
+            eps (torch.Tensor): Epsilon tensor.
         
         Returns:
             Interval: Output interval bounds after passing through the module and plugins.
         """
         for plugin in self.plugins:
-            x = plugin.forward(x, y)
+            x = plugin.forward(x, y, eps)
         
         return x
         

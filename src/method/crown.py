@@ -53,7 +53,7 @@ class CROWN(MethodPluginABC):
 
         log.info(f"CROWN plugin initialized for epsilon={self.epsilon}")
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor) -> Interval:
+    def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
         """
         Perform a forward pass through the model and compute the interval bounds.
         Args:
@@ -69,8 +69,8 @@ class CROWN(MethodPluginABC):
               the provided `module` and the shape of the input tensor.
             - The bounds are computed using the specified method (`self._method`).
         """
-        
-        ptb = PerturbationLpNorm(norm = self._norm, eps = self.epsilon)
+        epsilon = eps * self.epsilon
+        ptb = PerturbationLpNorm(norm = self._norm, eps = epsilon)
         x = BoundedTensor(x, ptb)
 
         if self.lirpa_model is None:

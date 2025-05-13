@@ -90,9 +90,8 @@ class IBP(MethodPluginABC):
             ).forward(x, epsilon))
         ]
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor) -> Interval:
-        epsilon = self.epsilon * torch.ones_like(x)
-
+    def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
+        epsilon = self.epsilon * eps
         with torch.no_grad():
             for m in self.module.module.children():
                 for layer in m:

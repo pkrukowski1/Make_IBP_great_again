@@ -1,6 +1,7 @@
 from torch.utils.data import Dataset, Subset
 from torchvision import datasets, transforms
 
+from typing import List
 
 class CIFAR10(Dataset):
     """
@@ -26,13 +27,18 @@ class CIFAR10(Dataset):
         no_points (int or list): Optional number of data points to use.
     """
 
-    def __init__(self, data_path: str = './data', train: bool = False, flatten: bool = True, no_points=None):
+    def __init__(self, data_path: str = './data', train: bool = False, flatten: bool = True, no_points: int = None,
+                 **kwargs):
         if isinstance(no_points, (list, tuple)):
             no_points = no_points[0]
 
+        mean = kwargs["mean"]
+        std = kwargs["std"]
+
         transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Lambda(lambda x: x.view(-1)) if flatten else lambda x: x
+            transforms.Lambda(lambda x: x.view(-1)) if flatten else lambda x: x,
+            transforms.Normalize(mean=mean, std=std)
         ])
 
         full_data = datasets.CIFAR10(root=data_path, train=train, download=True, transform=transform)

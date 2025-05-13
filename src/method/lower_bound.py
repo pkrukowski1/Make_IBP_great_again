@@ -46,13 +46,16 @@ class LowerBound(MethodPluginABC):
         log.info(f"Ideal bound plugin initialized for epsilon={self.epsilon}")
     
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor) -> Interval:
+    def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
+
         """
         Performs a forward pass to compute the interval bounds for the given input tensor `x`.
 
         Args:
             x (torch.Tensor): The input tensor for which the interval bounds are to be computed.
             y (torch.Tensor): An additional input tensor (not used in this implementation).
+            eps (torch.Tensor): A tensor representing the perturbation range for generating random noise 
+                within the interval. It defines the maximum deviation allowed for the input tensor `x`.
 
         Returns:
             Interval: An object representing the computed lower and upper bounds for the output.
@@ -70,7 +73,7 @@ class LowerBound(MethodPluginABC):
 
         # Expand each input to (num_points) versions
         x_expanded = x.unsqueeze(1).expand(B, self.num_points, *shape)  # (B, N, ...)
-        noise = (torch.rand_like(x_expanded) * 2 - 1) * self.epsilon
+        noise = (torch.rand_like(x_expanded) * 2 - 1) * self.epsilon * eps
         perturbed = x_expanded + noise
         perturbed = perturbed.view(-1, *shape)  # (B * N, ...)
 

@@ -1,7 +1,7 @@
 defaults:
   - _self_
-  - network: mlp
-  - dataset: mnist
+  - network: conv_small_cifar
+  - dataset: cifar10
   - method: composer_affine_arithmetic
   - exp: get_output_bounds
 
