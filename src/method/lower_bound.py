@@ -14,14 +14,13 @@ class LowerBound(MethodPluginABC):
     for a given input tensor within a specified epsilon neighborhood. It uses random sampling
     to estimate the bounds.
     Attributes:
-        epsilon (float): The radius of the neighborhood around the input tensor for which
-            the bounds are computed.
+        epsilon (float): The perturbation scaling factor.
         num_points (int): The number of random points to sample within the epsilon neighborhood.
     Methods:
         __init__(epsilon: float, num_points: int = 1000):
             Initializes the LowerBound plugin with the specified input dimensionality,
             epsilon radius, and number of sampling points.
-        forward(x: torch.Tensor, y: torch.Tensor) -> Interval:
+        forward(x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
             Computes the lower and upper bounds of the model's output for the given input tensor
             `x` within the epsilon neighborhood. Returns an Interval object containing the
             minimum and maximum bounds.
@@ -47,25 +46,25 @@ class LowerBound(MethodPluginABC):
     
 
     def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
-
         """
-        Performs a forward pass to compute the interval bounds for the given input tensor `x`.
+        Computes the interval bounds for the given input tensor `x` using random sampling.
 
         Args:
             x (torch.Tensor): The input tensor for which the interval bounds are to be computed.
             y (torch.Tensor): An additional input tensor (not used in this implementation).
-            eps (torch.Tensor): A tensor representing the perturbation range for generating random noise 
-                within the interval. It defines the maximum deviation allowed for the input tensor `x`.
+            eps (torch.Tensor): A tensor representing the perturbation range. The final radii
+                for the perturbation are computed as `self.epsilon * eps`.
 
         Returns:
-            Interval: An object representing the computed lower and upper bounds for the output.
+            Interval: An object containing the computed lower and upper bounds for the output.
 
         Notes:
-            - The method uses a random sampling approach to generate points within the interval
-              defined by `x` and `epsilon`.
+            - The method uses random sampling to generate points within the interval defined by `x` and `epsilon`.
             - The module is evaluated in `eval` mode, and gradients are not computed during this process.
             - The lower and upper bounds of the output are determined by the minimum and maximum
               values of the module's outputs over the sampled points.
+            - The `eps` tensor allows for element-wise control of the perturbation range, enabling
+              more flexible interval computations.
         """
         self.module.eval()
         B = x.size(0)
@@ -85,4 +84,3 @@ class LowerBound(MethodPluginABC):
         max_bounds = outputs.max(dim=1).values  # (B, output_dim)
 
         return Interval(lower=min_bounds, upper=max_bounds)
-    

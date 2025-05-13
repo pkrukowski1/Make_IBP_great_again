@@ -19,17 +19,17 @@ class AlphaCROWN(MethodPluginABC):
     to compute certified intervals for neural network outputs under adversarial perturbations.
 
     Attributes:
-        epsilon (float): The perturbation budget for adversarial attacks, defining the 
-            maximum allowable deviation in the input.
+       epsilon (float): The perturbation scaling factor.
         gradient_iter (int): The number of iterations for optimizing the bounds during 
             the verification process.
         lr (float): The learning rate for optimizing the alpha parameters in the 
             CROWN-Optimized method.
 
-        lirpa_model (BoundedModule): A model wrapped with the LiRPA (Linear Relaxation-based 
-            Perturbation Analysis) library for certified robustness verification.
+        lirpa_model (BoundedModule or None): A model wrapped with the LiRPA (Linear 
+            Relaxation-based Perturbation Analysis) library for certified robustness 
+            verification. Initialized as None and set during the first forward pass.
         _method (str): The method name used for bound computation, set to 
-            "CROWN-Optimized (alpha-CROWN)".
+            "CROWN-Optimized".
         _norm (float): The norm type used for perturbation analysis, set to infinity norm.
         _ptb (PerturbationLpNorm): The perturbation object defining the norm and epsilon 
             for adversarial perturbations.
@@ -37,15 +37,15 @@ class AlphaCROWN(MethodPluginABC):
     Methods:
         __init__(epsilon: float, gradient_iter: int, lr: float) -> None:
             Initializes the AlphaCROWN plugin with the specified parameters.
-    def __init__(self, epsilon: float, gradient_iter: int, lr: float) -> None:
 
-        forward(x: torch.Tensor, y: torch.Tensor) -> Interval:
+        forward(x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
             Computes the certified lower and upper bounds for the neural network's output 
-            given an input tensor `x` and its corresponding label tensor `y`.
+            given an input tensor `x`, a target tensor `y`, and a scaling factor `eps`.
 
             Args:
                 x (torch.Tensor): The input tensor to the neural network.
-                y (torch.Tensor): The label tensor corresponding to the input.
+                y (torch.Tensor): The target tensor (not used in this method).
+                eps (torch.Tensor): A scaling factor for the perturbation radii.
 
             Returns:
                 Interval: An object containing the lower and upper bounds for the 
@@ -73,6 +73,8 @@ class AlphaCROWN(MethodPluginABC):
         Args:
             x (torch.Tensor): The input tensor to the model.
             y (torch.Tensor): The target tensor (not used in this method).
+            eps (torch.Tensor): A tensor representing the perturbation range. The final radii
+                for the perturbation are computed as `self.epsilon * eps`.
 
         Returns:
             Interval: An interval object containing the lower and upper bounds 
@@ -81,7 +83,7 @@ class AlphaCROWN(MethodPluginABC):
 
         Notes:
             - The method initializes a perturbation object (`PerturbationLpNorm`) 
-              with the specified norm and epsilon.
+              with the specified norm and a scaled epsilon (`self.epsilon * eps`).
             - If the LiRPA model (`lirpa_model`) is not already initialized, it 
               creates a `BoundedModule` for the given model and sets optimization 
               options for bound computation.

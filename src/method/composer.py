@@ -41,15 +41,15 @@ class Composer:
 
     def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
         """
-        Forward pass through the module and plugins.
-        
-        Args:
-            x (torch.Tensor): Input tensor.
-            y (torch.Tensor): Target tensor.
-            eps (torch.Tensor): Epsilon tensor.
-        
-        Returns:
-            Interval: Output interval bounds after passing through the module and plugins.
+        Performs the forward pass through the module and its associated plugins.
+        This method iteratively applies each plugin's forward method to the input tensor `x`,
+        using the target tensor `y` and epsilon tensor `eps` as additional inputs. The final
+        transformed tensor is returned as the output.
+            x (torch.Tensor): The input tensor to be processed.
+            y (torch.Tensor): The target tensor used for processing.
+            eps (torch.Tensor): A tensor representing the perturbation range. The final radii
+                for the perturbation are computed as `self.epsilon * eps` within a plugin.
+            Interval: The resulting interval bounds after processing through all plugins.
         """
         for plugin in self.plugins:
             x = plugin.forward(x, y, eps)

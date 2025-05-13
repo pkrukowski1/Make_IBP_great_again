@@ -17,39 +17,44 @@ class AffineNN(MethodPluginABC):
     AffineNN is a method plugin for performing affine arithmetic-based interval analysis 
     on neural networks. It supports interval tightening through learnable ReLU parameters 
     and gradient-based optimization.
+    
     Attributes:
-        module (nn.Module): The neural network module to analyze.
-        epsilon (float): The interval radius.
+        epsilon (float): The perturbation scaling factor.
         optimize_bounds (bool): Flag indicating whether to optimize bounds using gradient-based methods.
         gradient_iter (int): Number of gradient iterations for optimizing bounds (required if optimize_bounds is True).
         lr (float): Learning rate for the optimizer used in bounds optimization.
+
     Methods:
-        __init__(epsilon, optimize_bounds, gradient_iter=0, lr=0.1):
+        __init__(epsilon: float, optimize_bounds: bool, gradient_iter: int = 0, lr: float = 0.1):
             Initializes the AffineNN object with the given parameters.
-        get_bounds(x):
-            Computes the affine arithmetic bounds for the input tensor `x` with perturbation `epsilon`.
+        get_bounds(x: torch.Tensor, eps: torch.Tensor) -> Interval:
+            Computes the affine arithmetic bounds for the input tensor `x` with perturbation `eps`.
             Args:
                 x (torch.Tensor): Input tensor.
+                eps (torch.Tensor): Perturbation tensor.
             Returns:
                 Interval: The computed interval bounds for the input tensor.
-        tighten_up_intervals(z_L, z_U):
+                torch.Tensor: The accumulated error of the ReLU approximation.
+        tighten_up_intervals(z_L: torch.Tensor, z_U: torch.Tensor) -> torch.Tensor:
             Computes the loss for tightening interval bounds, ensuring valid and non-negative intervals.
             Args:
                 z_L (torch.Tensor): Lower bounds of the interval.
                 z_U (torch.Tensor): Upper bounds of the interval.
             Returns:
                 torch.Tensor: The computed loss for interval tightening.
-        _gradient_step(x):
+        _gradient_step(x: torch.Tensor, eps: torch.Tensor):
             Performs a single gradient step to optimize the bounds using the input tensor 
-            and target labels.
+            and perturbation tensor.
             Args:
                 x (torch.Tensor): Input tensor.
-        forward(x, y):
+                eps (torch.Tensor): Perturbation tensor.
+        forward(x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
             Computes the forward pass of the AffineNN method. If `optimize_bounds` is True, 
             performs gradient-based optimization to tighten bounds.
             Args:
                 x (torch.Tensor): Input tensor.
                 y (torch.Tensor): Target labels.
+                eps (torch.Tensor): Perturbation tensor.
             Returns:
                 Interval: The computed interval bounds after the forward pass.
     """
@@ -76,19 +81,29 @@ class AffineNN(MethodPluginABC):
         
     def get_bounds(self, x: torch.Tensor, eps: torch.Tensor) -> Interval:
         """
-        Computes the bounds of an affine arithmetic expression through a neural network.
-        This method propagates an affine expression through the layers of a neural network
-        to compute the resulting interval bounds. It supports specific layer types such as
-        `nn.Conv2d`, `nn.Linear`, and `nn.ReLU`.
-        Args:
-            x (float): The center value of the input interval.
-        Returns:
-            Tuple:
-            Interval: The resulting interval bounds after propagating through the network.
-            torch.Tensor: The accumulated error of the ReLU approximation.
-        Raises:
-            NotImplementedError: If the network contains a layer type that is not supported.
+        Computes the interval bounds of an affine arithmetic expression propagated through a neural network.
+
+        This method processes an affine arithmetic expression through the layers of a neural network to compute
+        the resulting interval bounds. It supports specific layer types such as `nn.Conv2d`, `nn.Linear`, `nn.ReLU`,
+        and `nn.Flatten`. The method also calculates the accumulated error introduced by the ReLU approximation
+        when optimizing bounds.
+
+            x (torch.Tensor): The center value of the input interval. Assumes the input is a single batch of data.
+                              If the input is batched, it will be squeezed to extract the first element.
+           eps (torch.Tensor): A tensor representing the perturbation range. The final radii
+                for the perturbation are computed as `self.epsilon * eps`.
+
+            Tuple[Interval, float]:
+                - Interval: The resulting interval bounds after propagating through the network.
+                - float: The accumulated error from the ReLU approximation.
+
+
+        Notes:
+            - This method assumes that the input `x` is a single batch of data. If `x` is a batch, it will be squeezed.
+            - The method tracks learnable ReLU parameters using `self.slope_relu_params` when `self.optimize_bounds` is enabled.
+            - The accumulated ReLU error is weighted by the layer index to prioritize earlier layers.
         """
+        
         # WARNING: This method assumes that the input x is a single batch of data.
         # If x is a batch, we need to squeeze it to get the first element.
         x = x.squeeze(0).squeeze(0)
@@ -140,6 +155,8 @@ class AffineNN(MethodPluginABC):
         Performs a single gradient descent step for optimizing the model.
         Args:
             x (torch.Tensor): Input tensor for the model.
+            eps (torch.Tensor): A tensor representing the perturbation range. The final radii
+                for the perturbation are computed as `self.epsilon * eps`.
         Returns:
             None
         Description:
@@ -172,6 +189,8 @@ class AffineNN(MethodPluginABC):
         Args:
             x (torch.Tensor): The input tensor for the affine arithmetic computation.
             y (torch.Tensor): The target or auxiliary tensor used in the computation.
+            eps (torch.Tensor): A tensor representing the perturbation range. The final radii
+                for the perturbation are computed as `self.epsilon * eps`.
         Returns:
             torch.Tensor: The computed bounds after applying affine arithmetic.
         Notes:
@@ -180,6 +199,8 @@ class AffineNN(MethodPluginABC):
               to refine the bounds.
             - The `get_bounds` method is used to compute the final bounds based on
               the input tensor and the epsilon tensor.
+            - During optimization, slope parameters for ReLU layers are initialized
+              and updated using the Adam optimizer.
         """
 
         if self.optimize_bounds:
