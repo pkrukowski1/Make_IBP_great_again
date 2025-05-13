@@ -1,2 +1,0 @@
-_target_: network.SDPModelLoader
-model_path: ${oc.env:MODEL_DIR}/cifar_cnn_b_adv.model

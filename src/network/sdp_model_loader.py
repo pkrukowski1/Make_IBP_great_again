@@ -9,8 +9,6 @@ from network.sdp_models_archs import (
     cnn_4layer,
     cnn_4layer_adv,
     cnn_4layer_adv4,
-    cnn_4layer_b,
-    cnn_4layer_b4,
     cnn_4layer_mix4,
     mnist_cnn_4layer
 )
@@ -21,8 +19,6 @@ class ModelArch(Enum):
     CIFAR_CNN_A_ADV4 = "cifar_cnn_a_adv4"
     CIFAR_CNN_A_MIX = "cifar_cnn_a_mix"
     CIFAR_CNN_A_MIX4 = "cifar_cnn_a_mix4"
-    CIFAR_CNN_B_ADV = "cifar_cnn_b_adv"
-    CIFAR_CNN_B_ADV4 = "cifar_cnn_b_adv4"
     MNIST_CNN_A_ADV = "mnist_cnn_a_adv"
 
 
@@ -32,8 +28,6 @@ ARCH_CONSTRUCTORS = {
     ModelArch.CIFAR_CNN_A_ADV4: cnn_4layer_adv4,
     ModelArch.CIFAR_CNN_A_MIX: cnn_4layer,
     ModelArch.CIFAR_CNN_A_MIX4: cnn_4layer_mix4,
-    ModelArch.CIFAR_CNN_B_ADV: cnn_4layer_b,
-    ModelArch.CIFAR_CNN_B_ADV4: cnn_4layer_b4,
     ModelArch.MNIST_CNN_A_ADV: mnist_cnn_4layer,
 }
 
