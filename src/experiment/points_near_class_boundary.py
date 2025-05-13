@@ -11,7 +11,8 @@ from hydra.utils import instantiate
 from tqdm import tqdm
 from utils.fabric import setup_fabric
 from utils.hydra import extract_output_dir
-from experiment.utils import get_dataloader, verify_point, generate_boundary_points, save_deteriotated_image, check_correct_prediction
+from experiment.utils import get_dataloader, verify_point, generate_boundary_points, save_deteriotated_image, \
+    check_correct_prediction, get_eps
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -45,10 +46,14 @@ def run(config: DictConfig):
         y = fabric.to_device(y)
 
         _, y_pred = check_correct_prediction(method.module, X, y)
+        base_eps = torch.ones_like(X)
+        base_eps = fabric.to_device(base_eps)
+
+        eps = get_eps(config, base_eps)
 
         start_time = time.time()
         
-        int_output_bounds = method.forward(X, y)
+        int_output_bounds = method.forward(X, y, eps)
         
         # Calculate processing time
         batch_time = time.time() - start_time

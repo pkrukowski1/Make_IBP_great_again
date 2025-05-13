@@ -11,7 +11,8 @@ from hydra.utils import instantiate
 from tqdm import tqdm
 from utils.fabric import setup_fabric
 from utils.hydra import extract_output_dir
-from experiment.utils import get_dataloader, verify_point, add_salt_and_pepper, save_deteriotated_image, check_correct_prediction
+from experiment.utils import get_dataloader, verify_point, add_salt_and_pepper, save_deteriotated_image, \
+    check_correct_prediction, get_eps
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -41,6 +42,10 @@ def run(config: DictConfig):
     for batch_idx, (X, y) in enumerate(tqdm(dataloader, desc="Processing batches")):
         X = fabric.to_device(X)
         y = fabric.to_device(y)
+        base_eps = torch.ones_like(X)
+        base_eps = fabric.to_device(base_eps)
+
+        eps = get_eps(config, base_eps)
 
         X = add_salt_and_pepper(X, amount=config.exp.amount, salt_vs_pepper=config.exp.salt_vs_pepper)
         if config.exp.save_images:
@@ -55,7 +60,7 @@ def run(config: DictConfig):
         
         start_time = time.time()
         
-        int_output_bounds = method.forward(X, y)
+        int_output_bounds = method.forward(X, y, eps)
         log.info(f"Batch {batch_idx+1}, Output Bounds: {int_output_bounds}")
         
         # Calculate processing time
