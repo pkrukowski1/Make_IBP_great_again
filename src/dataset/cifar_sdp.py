@@ -8,7 +8,6 @@ class CIFAR_SDP(Dataset):
     
     Args:
         data_path (str): Path to the .npy file containing image data.
-        labels_path (str): Path to the .npy file containing labels.
     """
     def __init__(self, data_path: str):
         self.images = np.load(f"{data_path}/X_sdp.npy")
