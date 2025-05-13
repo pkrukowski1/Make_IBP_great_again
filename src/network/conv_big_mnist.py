@@ -79,16 +79,17 @@ class ConvBigMNIST(nn.Module):
         """
 
         feature_layers = [
-            nn.Conv2d(self.in_channels, 32, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Conv2d(self.in_channels, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.Conv2d(32, 32, kernel_size=4, stride=2, padding=1),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.Conv2d(64, 64, kernel_size=4, stride=2, padding=1),
             nn.ReLU(),
             nn.Flatten()
         ]
+
 
         # Dynamically determine the number of features after flattening
         with torch.no_grad():
@@ -98,7 +99,7 @@ class ConvBigMNIST(nn.Module):
         classifier = [
             nn.Linear(hidden_units, 512),
             nn.ReLU(),
-            nn.Linear(512, 512, bias=False),
+            nn.Linear(512, 512),
             nn.ReLU(),
             nn.Linear(512, self.dim_out)
         ]

@@ -46,35 +46,4 @@ def load_conv_model(model: nn.Module, weight_path: str, device: str = "cpu") -> 
     if isinstance(state_dict, list):
         state_dict = state_dict[0]
 
-    model_state_dict = model.state_dict()
-    adjusted_state_dict = {}
-
-    for key, val in state_dict.items():
-        try:
-            parts = key.split('.')
-            if len(parts) == 2 and parts[1] in ['weight', 'bias']:
-                new_key = f"{parts[0]}.0.{parts[1]}"
-            else:
-                new_key = key
-        except (ValueError, IndexError):
-            new_key = key
-
-        if new_key in model_state_dict:
-            if model_state_dict[new_key].shape == val.shape:
-                adjusted_state_dict[new_key] = val
-            else:
-                print(f"Shape mismatch for key {new_key}: expected {model_state_dict[new_key].shape}, got {val.shape}")
-        else:
-            for model_key in model_state_dict:
-                if model_key.endswith(parts[-1]) and model_state_dict[model_key].shape == val.shape:
-                    adjusted_state_dict[model_key] = val
-                    break
-            else:
-                print(f"Key {new_key} (from {key}) not found in model state_dict")
-
-    # print(f"Adjusted state_dict keys: {list(adjusted_state_dict.keys())}")
-    # print(f"Model state_dict keys: {list(model_state_dict.keys())}")
-
-    if not adjusted_state_dict:
-        raise RuntimeError("No matching keys found in adjusted state_dict. Cannot load weights.")
-    model.load_state_dict(adjusted_state_dict, strict=True)
+    model.load_state_dict(state_dict)
