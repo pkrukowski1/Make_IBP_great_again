@@ -14,7 +14,6 @@ The Affine Arithmetic (AA) method is able to reduce the wrapping effect compared
 For the experiments and ablation study, we use 4 publicly available datasets:
 * [MNIST](https://pytorch.org/vision/stable/generated/torchvision.datasets.MNIST.html)
 * [CIFAR-10](https://pytorch.org/vision/stable/generated/torchvision.datasets.CIFAR10.html) 
-* [SVHN](https://pytorch.org/vision/main/generated/torchvision.datasets.SVHN.html)
 * [Digits](https://scikit-learn.org/stable/auto_examples/datasets/plot_digits_last_image.html)
 
 

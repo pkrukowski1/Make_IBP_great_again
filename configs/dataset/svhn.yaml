@@ -1,8 +1,0 @@
-_target_: torch.utils.data.DataLoader
-dataset:
-  _target_: dataset.SVHN
-  data_path: ${oc.env:DATA_DIR}/svhn
-  train: false
-  flatten: true
-  no_points: 1000
-batch_size: 1
