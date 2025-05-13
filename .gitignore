@@ -2,7 +2,6 @@
 .vscode/
 data/cifar10
 data/mnist
-data/eran
 .env
 */*/__pycache__
 outputs
