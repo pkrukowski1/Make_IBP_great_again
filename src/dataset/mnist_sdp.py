@@ -15,8 +15,7 @@ class MNIST_SDP(Dataset):
 
         assert len(self.images) == len(self.labels), "Image and label counts do not match."
 
-        if self.images.ndim == 3:
-            self.images = self.images[:, None, :, :]
+        self.images = self.images.transpose(0, 3, 1, 2)
 
     def __len__(self):
         return len(self.images)
