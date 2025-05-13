@@ -1,6 +1,8 @@
 */__pycache__
 .vscode/
-data/
+data/cifar10
+data/mnist
+data/eran
 .env
 */*/__pycache__
 outputs
