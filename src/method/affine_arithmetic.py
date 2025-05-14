@@ -106,9 +106,9 @@ class AffineNN(MethodPluginABC):
         
         # WARNING: This method assumes that the input x is a single batch of data.
         # If x is a batch, we need to squeeze it to get the first element.
-        x = x.squeeze(0).squeeze(0)
+        x = x.squeeze(0)
         epsilon = self.epsilon * eps
-        epsilon = epsilon.squeeze(0).squeeze(0)
+        epsilon = epsilon.squeeze(0)
         zl, zu = x - epsilon, x + epsilon
         expr = AffineExpr()
         interval = Interval(zl, zu)
@@ -182,6 +182,7 @@ class AffineNN(MethodPluginABC):
         self.optimizer.zero_grad()
         total_loss.backward()
         self.optimizer.step()
+        self.scheduler.step(total_loss)
     
     def forward(self, x, y, eps: torch.Tensor):
         """
@@ -219,6 +220,7 @@ class AffineNN(MethodPluginABC):
 
             self.optimizer = torch.optim.Adam([*self.slope_relu_params], lr=self.lr)
             self.criterion = nn.CrossEntropyLoss()
+            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', factor=0.5)
 
             for _ in range(self.gradient_iter):            
                 self._gradient_step(x,eps)
@@ -375,9 +377,9 @@ class AffineFunc:
         mask3 = torch.logical_not(torch.logical_or(mask1, mask2))
     
         e = torch.exp(slope.unsqueeze(0)).squeeze(0)
-
-        a0 = self.coeffs[..., 0]
-        S = torch.sum(torch.abs(self.coeffs[..., 1:]), axis=-1)
+        e = e[mask3]
+        a0 = self.coeffs[..., 0][mask3]
+        S = torch.sum(torch.abs(self.coeffs[..., 1:][mask3]), axis=-1)
 
         M = a0 + S
         B = 0.5 * e * M
@@ -385,20 +387,16 @@ class AffineFunc:
         D = torch.abs(B-c*a0)
 
         result = AffineFunc(shape=self.coeffs.shape, expr=self.expr)
-        result.coeffs = c.unsqueeze(-1) * self.coeffs
-        result.coeffs[..., 0] = B
-        D = D[mask3]
-        e = e[mask3]
-        M = M[mask3]
+        result.coeffs[mask1] = 0.0
+        result.coeffs[mask2] = self.coeffs[mask2]
+        result.coeffs[mask3] = c.unsqueeze(-1) * self.coeffs[mask3]
+        result.coeffs[..., 0][mask3] = B
         
         i1 = Interval(-D, -D)
         i2 = Interval((1-e)*M, (1-e)*M)
         hull_lower, hull_upper = interval_hull(i1, i2)
         
         error = (hull_upper - hull_lower).mean()
-
-        result.coeffs[mask1] *= 0.0
-        result.coeffs[mask2] = self.coeffs[mask2]
         result.add_var(Interval(hull_lower, hull_upper), mask3)
         return result, error
     
