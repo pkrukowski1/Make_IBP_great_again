@@ -3,10 +3,10 @@
 # Exit immediately if any command fails
 set -e
 
-# Get the directory where the script is located (affine_arithmetic/)
+# Get the directory where the script is located (ibp/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Define project root (4 levels up from affine_arithmetic/)
+# Define project root (4 levels up from ibp/)
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 
 # Load environment variables from .env file in project root
@@ -39,9 +39,9 @@ if [ ! -d "${CONFIG_DIR}" ]; then
     exit 1
 fi
 
-# Check if affine_arithmetic.yaml exists
-if [ ! -f "${CONFIG_DIR}/affine_arithmetic.yaml" ]; then
-    echo "Error: ${CONFIG_DIR}/affine_arithmetic.yaml not found."
+# Check if ibp.yaml exists
+if [ ! -f "${CONFIG_DIR}/ibp.yaml" ]; then
+    echo "Error: ${CONFIG_DIR}/ibp.yaml not found."
     exit 1
 fi
 
@@ -54,4 +54,4 @@ echo "WANDB_PROJECT: ${WANDB_PROJECT}"
 
 python "${MAIN_PY}" \
     --config-path "${CONFIG_DIR}" \
-    --config-name affine_arithmetic.yaml
+    --config-name ibp.yaml
