@@ -3,5 +3,5 @@ _target_: method.Composer
 
 plugins:
   - _target_: method.LowerBound
-    epsilon: 0.0
+    epsilon: 0.3
     num_points: 1000
