@@ -9,14 +9,19 @@ class CIFAR_SDP(Dataset):
     Args:
         data_path (str): Path to the .npy file containing image data.
     """
-    def __init__(self, data_path: str):
+    def __init__(self, data_path: str, **kwargs):
         self.images = np.load(f"{data_path}/X_sdp.npy")
         self.labels = np.load(f"{data_path}/y_sdp.npy")
 
         assert len(self.images) == len(self.labels), "Image and label counts do not match."
 
+        mean = np.array(kwargs["mean"]).reshape(1,-1,1,1)
+        std = np.array(kwargs["std"]).reshape(1,-1,1,1)
+
         if self.images.ndim == 4 and self.images.shape[-1] == 3:
             self.images = self.images.transpose(0, 3, 1, 2)
+
+        self.images = (self.images - mean) / std
 
     def __len__(self):
         return len(self.images)
