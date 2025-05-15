@@ -29,7 +29,7 @@ method:
     - _target_: method.AffineNN
       epsilon: 0.12
       optimize_bounds: True
-      gradient_iter: 1000
+      gradient_iter: 100
       lr: 0.1
       
       
