@@ -376,7 +376,7 @@ class AffineFunc:
         mask2 = c >= 0
         mask3 = torch.logical_not(torch.logical_or(mask1, mask2))
     
-        e = torch.exp(slope.unsqueeze(0)).squeeze(0)
+        e = 0.5 * (1 + torch.tanh(slope))
         e = e[mask3]
         a0 = self.coeffs[..., 0][mask3]
         S = torch.sum(torch.abs(self.coeffs[..., 1:][mask3]), axis=-1)
