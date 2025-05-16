@@ -212,10 +212,10 @@ class AffineNN(MethodPluginABC):
                         prev_layer = m[idx-1]
                         if isinstance(prev_layer, nn.Conv2d):
                             out_shape = self.module.layer_outputs.get(prev_layer)
-                            slope = nn.Parameter(torch.log(0.5*torch.ones(out_shape)), requires_grad=True).to(DEVICE)
+                            slope = nn.Parameter(0.5*torch.ones(out_shape), requires_grad=True).to(DEVICE)
 
                         elif isinstance(prev_layer, nn.Linear):
-                            slope = nn.Parameter(torch.log(0.5*torch.ones(prev_layer.out_features)), requires_grad=True).to(DEVICE)
+                            slope = nn.Parameter(0.5*torch.ones(prev_layer.out_features), requires_grad=True).to(DEVICE)
                         self.slope_relu_params.append(slope)
 
             self.optimizer = torch.optim.Adam([*self.slope_relu_params], lr=self.lr)
