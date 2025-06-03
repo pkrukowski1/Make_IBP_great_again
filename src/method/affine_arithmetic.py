@@ -2,6 +2,7 @@ import logging
 
 from method.interval_arithmetic import Interval, interval_hull, intersection
 from method.method_plugin_abc import MethodPluginABC
+from utils.early_stopping import EarlyStopping
 
 import torch
 import torch.nn as nn
@@ -42,9 +43,9 @@ class AffineNN(MethodPluginABC):
                 z_U (torch.Tensor): Upper bounds of the interval.
             Returns:
                 torch.Tensor: The computed loss for interval tightening.
-        _gradient_step(x: torch.Tensor, eps: torch.Tensor):
+        _gradient_step(x: torch.Tensor, eps: torch.Tensor) -> float:
             Performs a single gradient step to optimize the bounds using the input tensor 
-            and perturbation tensor.
+            and perturbation tensor. It returns float representing the total value of a loss function.
             Args:
                 x (torch.Tensor): Input tensor.
                 eps (torch.Tensor): Perturbation tensor.
@@ -129,7 +130,7 @@ class AffineNN(MethodPluginABC):
 
                         affine_func, error = affine_func.relu(slope)
 
-                        relu_loss += (idx_layer+1)*error
+                        relu_loss += error
                         relu_param_idx += 1
                 elif isinstance(layer, nn.Flatten):
                     affine_func = affine_func.flatten()
@@ -150,7 +151,7 @@ class AffineNN(MethodPluginABC):
         
         return loss_tight
     
-    def _gradient_step(self, x, eps):
+    def _gradient_step(self, x, eps) -> float:
         """
         Performs a single gradient descent step for optimizing the model.
         Args:
@@ -158,7 +159,7 @@ class AffineNN(MethodPluginABC):
             eps (torch.Tensor): A tensor representing the perturbation range. The final radii
                 for the perturbation are computed as `self.epsilon * eps`.
         Returns:
-            None
+            loss (float): Total value of used loss function.
         Description:
             This method computes the forward pass to obtain the bounds of the output
             intervals using `get_bounds`. It calculates the loss for tightening the
@@ -183,6 +184,8 @@ class AffineNN(MethodPluginABC):
         total_loss.backward()
         self.optimizer.step()
         self.scheduler.step(total_loss)
+
+        return total_loss.item()
     
     def forward(self, x, y, eps: torch.Tensor):
         """
@@ -212,20 +215,26 @@ class AffineNN(MethodPluginABC):
                         prev_layer = m[idx-1]
                         if isinstance(prev_layer, nn.Conv2d):
                             out_shape = self.module.layer_outputs.get(prev_layer)
-                            slope = nn.Parameter(torch.log(0.5*torch.ones(out_shape)), requires_grad=True).to(DEVICE)
+                            slope = nn.Parameter(0.5*torch.ones(out_shape), requires_grad=True).to(DEVICE)
 
                         elif isinstance(prev_layer, nn.Linear):
-                            slope = nn.Parameter(torch.log(0.5*torch.ones(prev_layer.out_features)), requires_grad=True).to(DEVICE)
+                            slope = nn.Parameter(0.5*torch.ones(prev_layer.out_features), requires_grad=True).to(DEVICE)
                         self.slope_relu_params.append(slope)
 
             self.optimizer = torch.optim.Adam([*self.slope_relu_params], lr=self.lr)
             self.criterion = nn.CrossEntropyLoss()
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', factor=0.5)
+            self.early_stopping = EarlyStopping(patience=50, min_delta=0.0, verbose=False)
 
-            for _ in range(self.gradient_iter):            
-                self._gradient_step(x,eps)
+            for idx in range(self.gradient_iter):            
+                loss = self._gradient_step(x,eps)
+
+                if self.early_stopping(loss):
+                    log.info(f"Stopping early at {idx+1}-th iteration")
+                    break
+
         outputs, _ = self.get_bounds(x,eps)
-           
+
         return outputs
 
 class AffineFunc:
@@ -375,25 +384,51 @@ class AffineFunc:
         mask1 = c <= 0
         mask2 = c >= 0
         mask3 = torch.logical_not(torch.logical_or(mask1, mask2))
-    
-        e = 0.5 * (1 + torch.tanh(slope))
+
+        e = slope
         e = e[mask3]
         a0 = self.coeffs[..., 0][mask3]
         S = torch.sum(torch.abs(self.coeffs[..., 1:][mask3]), axis=-1)
 
         M = a0 + S
         B = 0.5 * e * M
-        c = B/S
-        D = torch.abs(B-c*a0)
+        c = B / S
 
+        D_min = torch.empty_like(e).to(device=DEVICE)
+        D_max = torch.empty_like(e).to(device=DEVICE)
+
+        # Case 0: e <= 0
+        cond0 = e <= 0
+
+        # Case 1: 0 < e < 1
+        cond1 = (e > 0) & (e < 1)
+
+        # Case 2: 1 <= e < 2*S/M
+        cond2 = (e >= 1) & (e < 2 * S / M)
+
+        # Case 3: e >= 2*S/M
+        cond3 = e >= 2 * S / M
+
+        D_min[cond0] = torch.zeros_like(e[cond0])
+        D_max[cond0] = (1 - e[cond0]) * M[cond0]
+
+        D_min[cond1] = torch.abs(B[cond1] - c[cond1] * a0[cond1])
+        D_max[cond1] = (1 - e[cond1]) * M[cond1]
+
+        D_min[cond2] = torch.abs(B[cond2] - c[cond2] * a0[cond2])
+        D_max[cond2] = torch.zeros_like(e[cond2])
+
+        D_min[cond3] = (1 - e[cond3]) * M[cond3]
+        D_max[cond3] = torch.zeros_like(e[cond3])
+            
         result = AffineFunc(shape=self.coeffs.shape, expr=self.expr)
         result.coeffs[mask1] = 0.0
         result.coeffs[mask2] = self.coeffs[mask2]
         result.coeffs[mask3] = c.unsqueeze(-1) * self.coeffs[mask3]
         result.coeffs[..., 0][mask3] = B
         
-        i1 = Interval(-D, -D)
-        i2 = Interval((1-e)*M, (1-e)*M)
+        i1 = Interval(-D_min, -D_min)
+        i2 = Interval(D_max, D_max)
         hull_lower, hull_upper = interval_hull(i1, i2)
         
         error = (hull_upper - hull_lower).mean()
