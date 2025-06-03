@@ -27,9 +27,9 @@ method:
   _target_: method.Composer
   plugins:
     - _target_: method.AffineNN
-      epsilon: 0.3
+      epsilon: 0.15
       optimize_bounds: True
-      gradient_iter: 40
+      gradient_iter: 200
       lr: 0.1
       
       

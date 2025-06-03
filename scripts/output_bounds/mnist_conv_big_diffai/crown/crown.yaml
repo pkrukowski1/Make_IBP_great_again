@@ -27,7 +27,7 @@ method:
   _target_: method.Composer
   plugins:
     - _target_: method.CROWN
-      epsilon: 0.3
+      epsilon: 0.15
 
 dataset:
   _target_: torch.utils.data.DataLoader

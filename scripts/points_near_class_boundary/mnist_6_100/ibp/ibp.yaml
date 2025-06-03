@@ -32,7 +32,7 @@ method:
   _target_: method.Composer
   plugins:
     - _target_: method.IBP
-      epsilon: 0.026
+      epsilon: 0.013
 
 dataset:
   _target_: torch.utils.data.DataLoader

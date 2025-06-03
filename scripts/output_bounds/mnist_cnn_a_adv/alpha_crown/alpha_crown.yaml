@@ -26,8 +26,8 @@ method:
   _target_: method.Composer
   plugins:
     - _target_: method.AlphaCROWN
-      epsilon: 0.3
-      gradient_iter: 1000
+      epsilon: 0.15
+      gradient_iter: 200
       lr: 0.1
       
       

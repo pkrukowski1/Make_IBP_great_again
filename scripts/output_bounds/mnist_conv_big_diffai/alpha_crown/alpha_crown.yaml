@@ -27,9 +27,9 @@ method:
   _target_: method.Composer
   plugins:
     - _target_: method.AlphaCROWN
-      epsilon: 0.3
+      epsilon: 0.15
       lr: 0.1
-      gradient_iter: 40
+      gradient_iter: 200
 
 dataset:
   _target_: torch.utils.data.DataLoader

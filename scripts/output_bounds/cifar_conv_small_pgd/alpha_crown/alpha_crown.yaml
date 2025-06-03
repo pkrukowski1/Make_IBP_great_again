@@ -27,8 +27,8 @@ method:
   _target_: method.Composer
   plugins:
     - _target_: method.AlphaCROWN
-      epsilon: 0.00784313725
-      gradient_iter: 1000
+      epsilon: 0.00784313725 
+      gradient_iter: 200
       lr: 0.1
 
 dataset:

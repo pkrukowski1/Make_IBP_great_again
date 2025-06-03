@@ -29,7 +29,7 @@ method:
   _target_: method.Composer
   plugins:
     - _target_: method.LowerBound
-      epsilon: 0.026
+      epsilon: 0.013
 
 dataset:
   _target_: torch.utils.data.DataLoader
