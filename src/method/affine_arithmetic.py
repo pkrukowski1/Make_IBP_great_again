@@ -2,6 +2,7 @@ import logging
 
 from method.interval_arithmetic import Interval, interval_hull, intersection
 from method.method_plugin_abc import MethodPluginABC
+from utils.early_stopping import EarlyStopping
 
 import torch
 import torch.nn as nn
@@ -42,9 +43,9 @@ class AffineNN(MethodPluginABC):
                 z_U (torch.Tensor): Upper bounds of the interval.
             Returns:
                 torch.Tensor: The computed loss for interval tightening.
-        _gradient_step(x: torch.Tensor, eps: torch.Tensor):
+        _gradient_step(x: torch.Tensor, eps: torch.Tensor) -> float:
             Performs a single gradient step to optimize the bounds using the input tensor 
-            and perturbation tensor.
+            and perturbation tensor. It returns float representing the total value of a loss function.
             Args:
                 x (torch.Tensor): Input tensor.
                 eps (torch.Tensor): Perturbation tensor.
@@ -150,7 +151,7 @@ class AffineNN(MethodPluginABC):
         
         return loss_tight
     
-    def _gradient_step(self, x, eps):
+    def _gradient_step(self, x, eps) -> float:
         """
         Performs a single gradient descent step for optimizing the model.
         Args:
@@ -158,7 +159,7 @@ class AffineNN(MethodPluginABC):
             eps (torch.Tensor): A tensor representing the perturbation range. The final radii
                 for the perturbation are computed as `self.epsilon * eps`.
         Returns:
-            None
+            loss (float): Total value of used loss function.
         Description:
             This method computes the forward pass to obtain the bounds of the output
             intervals using `get_bounds`. It calculates the loss for tightening the
@@ -183,6 +184,8 @@ class AffineNN(MethodPluginABC):
         total_loss.backward()
         self.optimizer.step()
         self.scheduler.step(total_loss)
+
+        return total_loss.item()
     
     def forward(self, x, y, eps: torch.Tensor):
         """
@@ -221,11 +224,17 @@ class AffineNN(MethodPluginABC):
             self.optimizer = torch.optim.Adam([*self.slope_relu_params], lr=self.lr)
             self.criterion = nn.CrossEntropyLoss()
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', factor=0.5)
+            self.early_stopping = EarlyStopping(patience=50, min_delta=0.0, verbose=False)
 
-            for _ in range(self.gradient_iter):            
-                self._gradient_step(x,eps)
+            for idx in range(self.gradient_iter):            
+                loss = self._gradient_step(x,eps)
+
+                if self.early_stopping(loss):
+                    log.info(f"Stopping early at {idx+1}-th iteration")
+                    break
+
         outputs, _ = self.get_bounds(x,eps)
-           
+
         return outputs
 
 class AffineFunc:
