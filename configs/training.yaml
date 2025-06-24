@@ -9,7 +9,7 @@ training:
   epsilon: 0.15
   start_warmup_epoch: 0
   end_warmup_epoch: 100
-  epochs: 100
+  epochs: 200
   lr: 0.001
   use_scheduler: False
 

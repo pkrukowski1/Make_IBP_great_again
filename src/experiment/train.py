@@ -107,9 +107,9 @@ def run(config: DictConfig):
     method = instantiate(config.method)(model)
 
     log.info(f'Setting up dataloaders')
-    train_loader = get_dataloader(config.dataset.train, fabric)
-    val_loader   = get_dataloader(config.dataset.val, fabric)
-    test_loader  = get_dataloader(config.dataset.test, fabric)
+    train_loader = get_dataloader(config.dataset, fabric, split='train')
+    val_loader   = get_dataloader(config.dataset, fabric, split='val')
+    test_loader  = get_dataloader(config.dataset, fabric, split='test')
 
     extracted_output_dir = extract_output_dir(config)
     output_file = f"{extracted_output_dir}/training_log.json"
@@ -117,9 +117,9 @@ def run(config: DictConfig):
     log.info(f'Initializing the trainer')
     trainer = Trainer(
         epsilon=config.training.epsilon,
-        used_method=method,
-        start_epoch=config.training.start_epoch,
-        end_epoch=config.training.end_epoch,
+        method=method,
+        start_epoch=config.training.start_warmup_epoch,
+        end_epoch=config.training.end_warmup_epoch,
     )
 
     optimizer = torch.optim.Adam(trainer.method.module.parameters(), lr=config.training.lr)

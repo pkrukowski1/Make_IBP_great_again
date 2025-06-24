@@ -107,9 +107,7 @@ class AffineNN(MethodPluginABC):
         
         # WARNING: This method assumes that the input x is a single batch of data.
         # If x is a batch, we need to squeeze it to get the first element.
-        x = x.squeeze(0)
         epsilon = self.epsilon * eps
-        epsilon = epsilon.squeeze(0)
         zl, zu = x - epsilon, x + epsilon
         expr = AffineExpr()
         interval = Interval(zl, zu)
@@ -490,7 +488,10 @@ class AffineFunc:
         return g
     
     def conv2d(self, conv_layer: nn.Conv2d):
-        x = self.coeffs.permute(3, 0, 1, 2)
+        x = self.coeffs.permute(4, 0, 1, 2, 3)
+        n_affine_vars, batch_size, in_channels, height, width = x.shape
+        x = x.reshape(n_affine_vars * batch_size, in_channels, height, width)
+       
         x = F.conv2d(
             x,
             weight=conv_layer.weight,
@@ -500,10 +501,12 @@ class AffineFunc:
             dilation=conv_layer.dilation,
             groups=conv_layer.groups
         )
-        x = x.permute(1, 2, 3, 0)
+       
+        x = x.reshape(n_affine_vars, batch_size, conv_layer.out_channels, x.shape[-2], x.shape[-1])
+        x = x.permute(1, 2, 3, 4, 0)
 
         if conv_layer.bias is not None:
-            x[..., 0] += conv_layer.bias.view(-1, *([1] * (x.dim() - 2)))
+            x[..., 0] += conv_layer.bias.view(1, -1, 1, 1)
 
         return AffineFunc(c=x, expr=self.expr)
 
@@ -512,8 +515,8 @@ class AffineFunc:
         b = linear_layer.bias
         
         x = self.coeffs
-        x = torch.einsum("ea,oe->oa", x, A)
-        
+        x = torch.einsum("iea,oe->ioa", x, A)
+
         if b is not None:
             x[..., 0] += b.view(*([1] * (x.dim() - 2)), -1)
             
@@ -521,7 +524,7 @@ class AffineFunc:
     
     def flatten(self):
         x = self.coeffs
-        x = x.flatten(start_dim=0, end_dim=-2)
+        x = x.flatten(start_dim=1, end_dim=-2)
         return AffineFunc(c=x, expr=self.expr)
 
 class AffineExpr:

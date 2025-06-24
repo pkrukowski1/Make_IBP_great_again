@@ -1,23 +1,35 @@
-_target_: torch.utils.data.DataLoader
-
 dataset:
-  _target_: dataset.MNIST
   train:
-    _target_: dataset.MNIST
-    data_path: ./data
-    train: true
-    flatten: false
-    split_ratio: [0.8, 0.2]  # 80% for training
+    _target_: torch.utils.data.DataLoader
+    dataset:
+      _target_: dataset.MNIST
+      data_path: ./data/mnist
+      train: true
+      flatten: false
+      split_ratio: [0.8, 0.2]
+    batch_size: 2
+    shuffle: true
+    num_workers: 4
 
   val:
-    _target_: dataset.MNIST
-    data_path: ./data
-    train: true
-    flatten: false
-    split_ratio: [0.8, 0.2]  # 20% for validation
+    _target_: torch.utils.data.DataLoader
+    dataset:
+      _target_: dataset.MNIST
+      data_path: ./data/mnist
+      train: true
+      flatten: false
+      split_ratio: [0.8, 0.2]
+    batch_size: 2
+    shuffle: false
+    num_workers: 4
 
   test:
-    _target_: dataset.MNIST
-    data_path: ./data
-    train: false
-    flatten: false
+    _target_: torch.utils.data.DataLoader
+    dataset:
+      _target_: dataset.MNIST
+      data_path: ./data/mnist
+      train: false
+      flatten: false
+    batch_size: 2
+    shuffle: false
+    num_workers: 4

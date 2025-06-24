@@ -19,16 +19,21 @@ def squeeze_batch_dim(tensor: torch.Tensor) -> torch.Tensor:
     """Squeeze batch dimension if batch size is 1, else return unchanged."""
     return tensor.squeeze(0) if tensor.size(0) == 1 else tensor
 
-def get_dataloader(config: DictConfig, fabric) -> DataLoader:
+def get_dataloader(config: DictConfig, fabric, split: str = None) -> DataLoader:
     """
     Initializes and returns a dataloader using the provided configuration and fabric.
     Args:
         config (dict): A configuration object containing the dataset settings.
         fabric (object): An object responsible for setting up dataloaders.
+        split (str, optional): The dataset split to be used (e.g., 'train', 'val', 'test').
+            If provided, it will be used to instantiate the dataset.
     Returns:
         DataLoader: A dataloader instance prepared using the specified configuration and fabric.
     """
-    return fabric.setup_dataloaders(instantiate(config.dataset))
+    if split is not None:
+        return fabric.setup_dataloaders(instantiate(config.dataset[split]))
+    else:
+        return fabric.setup_dataloaders(instantiate(config.dataset))
 
 def verify_point(output_bounds: Interval, y_pred: torch.Tensor, y_gt: torch.Tensor) -> float:
     """

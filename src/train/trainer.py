@@ -84,10 +84,11 @@ class Trainer:
         Returns:
             Tuple[torch.Tensor, Interval]: Total loss, and interval output bounds.
         """
-        eps = torch.full((x.size(0),), self.current_epsilon, device=x.device)
+        # Eps will be multiplied by a proper value inside the `self.method.forward` method.
+        eps = torch.ones_like(x, device=x.device)
 
         # Interval bounds (robust)
-        out_bounds = self.method(x, y, eps)
+        out_bounds = self.method.forward(x, y, eps)
 
         # Natural output (standard logits)
         logits = self.method.module(x)
@@ -115,7 +116,7 @@ class Trainer:
         # Robust hinge-style loss
         lower = bounds.lower
         upper = bounds.upper
-
+        print(f"Lower")
         batch_size = lower.size(0)
         num_classes = lower.size(1)
 
