@@ -85,7 +85,6 @@ class Trainer:
 
         # Interval bounds (robust)
         out_bounds = self.method.forward(x, y, eps)
-        print(out_bounds)
 
         # Natural output (standard logits)
         logits = self.method.module(x)
