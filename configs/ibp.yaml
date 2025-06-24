@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - network: mlp
-  - dataset: mnist
+  - dataset: mnist_eran
   - method: composer_ibp
   - exp: get_output_bounds
 

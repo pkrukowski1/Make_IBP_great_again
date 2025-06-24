@@ -1,20 +1,13 @@
 import torch
 import logging
 from typing import Tuple
-from enum import Enum
 
 from method.interval_arithmetic import Interval
 from method.affine_arithmetic import AffineNN
+from method.method_plugin_abc import MethodPluginABC
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
-
-
-class MethodType(str, Enum):
-    """
-    Enum representing the supported bound propagation methods.
-    """
-    AFFINE = "AffineArithmetic"
 
 
 class Trainer:
@@ -26,18 +19,16 @@ class Trainer:
     def __init__(
         self,
         epsilon: float,
-        used_method: MethodType,
+        method: MethodPluginABC,
         start_epoch: int = 0,
         end_epoch: int = 100,
-        *args,
-        **kwargs
     ) -> None:
         """
         Initializes the Trainer.
 
         Args:
             epsilon (float): Target epsilon after warm-up.
-            used_method (MethodType): Bound propagation method to use.
+            used_method (MethodPluginABC): Bound propagation method to use.
             start_epoch (int): Epoch to begin increasing epsilon and decreasing kappa.
             end_epoch (int): Epoch to reach full epsilon and zero kappa.
         """
@@ -53,17 +44,10 @@ class Trainer:
         self.end_epoch = end_epoch
         self.current_epoch = 0
 
-        if used_method == MethodType.AFFINE:
-            self.method = AffineNN(
-                epsilon=self.current_epsilon,
-                optimize_bounds=False,
-                *args,
-                **kwargs
-            )
-        else:
-            raise ValueError(f"Unsupported method: {used_method}")
+        self.method = method
+      
 
-        log.info(f"Trainer initialized with epsilon ∈ [0, {self.epsilon_schedule}], kappa ∈ [1, 0]")
+        log.info(f"Trainer initialized with epsilon = {self.epsilon_schedule}]")
 
     def set_epoch(self, epoch: int) -> None:
         """

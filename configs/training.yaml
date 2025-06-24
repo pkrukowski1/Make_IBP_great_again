@@ -2,8 +2,16 @@ defaults:
   - _self_
   - network: cnn_4_layers
   - dataset: mnist
-  - training: train_affine_arithmetic
+  - method: composer_affine_arithmetic
   - exp: train
+
+training:
+  epsilon: 0.15
+  start_warmup_epoch: 0
+  end_warmup_epoch: 100
+  epochs: 100
+  lr: 0.001
+  use_scheduler: False
 
 fabric:
   _target_: lightning.Fabric

@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
 
 import os
 import uuid
@@ -18,7 +19,7 @@ def squeeze_batch_dim(tensor: torch.Tensor) -> torch.Tensor:
     """Squeeze batch dimension if batch size is 1, else return unchanged."""
     return tensor.squeeze(0) if tensor.size(0) == 1 else tensor
 
-def get_dataloader(config: DictConfig, fabric) -> torch.utils.data.DataLoader:
+def get_dataloader(config: DictConfig, fabric) -> DataLoader:
     """
     Initializes and returns a dataloader using the provided configuration and fabric.
     Args:
@@ -224,5 +225,3 @@ def get_eps(config: DictConfig, eps: torch.Tensor) -> torch.Tensor:
         std = torch.tensor(std, device=eps.device).view(1, 3, 1, 1)
         eps = eps / std
     return eps
-
-    

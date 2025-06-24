@@ -1,8 +1,23 @@
 _target_: torch.utils.data.DataLoader
+
 dataset:
   _target_: dataset.MNIST
-  data_path: ${oc.env:DATA_DIR}/mnist
-  train: false
-  flatten: false
-  no_points: 1000
-batch_size: 1
+  train:
+    _target_: dataset.MNIST
+    data_path: ./data
+    train: true
+    flatten: false
+    split_ratio: [0.8, 0.2]  # 80% for training
+
+  val:
+    _target_: dataset.MNIST
+    data_path: ./data
+    train: true
+    flatten: false
+    split_ratio: [0.8, 0.2]  # 20% for validation
+
+  test:
+    _target_: dataset.MNIST
+    data_path: ./data
+    train: false
+    flatten: false

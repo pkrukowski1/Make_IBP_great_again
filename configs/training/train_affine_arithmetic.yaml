@@ -1,7 +1,0 @@
-_partial_: True
-
-_target_: train.Trainer
-used_method: AffineArithmetic
-epsilon: 0.15
-start_epoch: 0
-end_epoch: 100

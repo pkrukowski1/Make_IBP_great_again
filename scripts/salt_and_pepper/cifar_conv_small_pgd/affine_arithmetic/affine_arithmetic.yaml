@@ -40,7 +40,7 @@ method:
 dataset:
   _target_: torch.utils.data.DataLoader
   dataset:
-    _target_: dataset.CIFAR10
+    _target_: dataset.CIFAR_ERAN
     data_path: ${oc.env:DATA_DIR}/cifar10
     train: false
     flatten: false

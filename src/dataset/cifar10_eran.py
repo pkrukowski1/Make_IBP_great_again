@@ -1,9 +1,7 @@
 from torch.utils.data import Dataset, Subset
 from torchvision import datasets, transforms
 
-from typing import List
-
-class CIFAR10(Dataset):
+class CIFAR_ERAN(Dataset):
     """
     CIFAR10 Dataset Wrapper
     This class provides a wrapper around the CIFAR-10 dataset, allowing for easy access
