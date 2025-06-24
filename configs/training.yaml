@@ -1,15 +1,16 @@
 defaults:
   - _self_
-  - network: cnn_4_layers
+  - network: conv_small_b
   - dataset: mnist
   - method: composer_affine_arithmetic
   - exp: train
 
 training:
   start_warmup_epoch: 0
-  end_warmup_epoch: 50
-  epochs: 200
-  lr: 0.001
+  end_warmup_epoch: 1
+  schedule_epochs_after_warmup: 60
+  epochs: 100
+  lr: 0.0005
   use_scheduler: False
 
 fabric:
