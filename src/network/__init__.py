@@ -5,3 +5,4 @@ from .conv_big_mnist import ConvBigMNIST
 from .conv_small_cifar import ConvSmallCIFAR
 from .conv_big_cifar import ConvBigCIFAR
 from .sdp_model_loader import SDPModelLoader
+from .conv_4_layers import Conv4Layers

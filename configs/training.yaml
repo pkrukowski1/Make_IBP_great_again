@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - network: mnist_cnn_4_layers
+  - network: cnn_4_layers
   - dataset: mnist
   - training: train_affine_arithmetic
   - exp: train
