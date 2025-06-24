@@ -1,0 +1,16 @@
+defaults:
+  - _self_
+  - network: mnist_cnn_4_layers
+  - dataset: mnist
+  - training: train_affine_arithmetic
+  - exp: train
+
+fabric:
+  _target_: lightning.Fabric
+  num_nodes: 1
+  devices: 1
+  accelerator: cpu
+
+wandb:
+  entity: ${oc.env:WANDB_ENTITY}
+  project: ${oc.env:WANDB_PROJECT}
