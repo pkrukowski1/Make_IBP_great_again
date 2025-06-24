@@ -196,12 +196,6 @@ def run(config: DictConfig):
                 "train/bound_width_hist": wandb.Histogram(flat_bound_width)
             })
 
-            # Print every 10 batches
-            if batch_idx % 10 == 0:
-                print(f"Batch {batch_idx} — Loss: {loss.item():.6f}, Bound Avg: {avg_bound_width:.6f}, "
-                    f"Bound Max: {max_bound_width:.6f}, Bound Min: {min_bound_width:.6f}")
-
-
         avg_train_loss = epoch_loss / total_samples
         train_accuracy = total_correct / total_samples
 
