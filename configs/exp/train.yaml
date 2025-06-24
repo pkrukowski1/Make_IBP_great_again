@@ -1,7 +1,6 @@
 __partial__: True
 
 seed: 42
-epochs: 100
 log_dir: # set during runtime to automatically created dir
 run_func: 
   _target_: experiment.run_training

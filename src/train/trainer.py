@@ -18,7 +18,6 @@ class Trainer:
 
     def __init__(
         self,
-        epsilon: float,
         method: MethodPluginABC,
         start_epoch: int = 0,
         end_epoch: int = 100,
@@ -27,14 +26,12 @@ class Trainer:
         Initializes the Trainer.
 
         Args:
-            epsilon (float): Target epsilon after warm-up.
             used_method (MethodPluginABC): Bound propagation method to use.
             start_epoch (int): Epoch to begin increasing epsilon and decreasing kappa.
             end_epoch (int): Epoch to reach full epsilon and zero kappa.
         """
         super().__init__()
-
-        self.epsilon_schedule = epsilon
+        self.epsilon_schedule = method.plugins[0].epsilon
         self.current_epsilon = 0.0
 
         self.kappa_schedule = True
@@ -44,9 +41,8 @@ class Trainer:
         self.end_epoch = end_epoch
         self.current_epoch = 0
 
-        self.method = method
+        self.method = method.plugins[0]
       
-
         log.info(f"Trainer initialized with epsilon = {self.epsilon_schedule}]")
 
     def set_epoch(self, epoch: int) -> None:
@@ -89,6 +85,7 @@ class Trainer:
 
         # Interval bounds (robust)
         out_bounds = self.method.forward(x, y, eps)
+        print(out_bounds)
 
         # Natural output (standard logits)
         logits = self.method.module(x)
@@ -116,7 +113,7 @@ class Trainer:
         # Robust hinge-style loss
         lower = bounds.lower
         upper = bounds.upper
-        print(f"Lower")
+
         batch_size = lower.size(0)
         num_classes = lower.size(1)
 

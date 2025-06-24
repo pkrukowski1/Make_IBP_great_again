@@ -116,7 +116,6 @@ def run(config: DictConfig):
 
     log.info(f'Initializing the trainer')
     trainer = Trainer(
-        epsilon=config.training.epsilon,
         method=method,
         start_epoch=config.training.start_warmup_epoch,
         end_epoch=config.training.end_warmup_epoch,
