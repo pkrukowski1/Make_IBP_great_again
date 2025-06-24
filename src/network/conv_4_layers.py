@@ -11,7 +11,7 @@ class Conv4Layers(nn.Module):
             self, 
             in_channels: int, 
             dim_out: int, 
-            input_wdith: int, 
+            input_width: int, 
             input_height: int, 
             dim_linear: int, 
             width: int
@@ -22,7 +22,7 @@ class Conv4Layers(nn.Module):
         Args:
             in_channels (int): Number of input channels for the first convolutional layer.
             dim_out (int): Number of output features for the final layer.
-            input_wdith (int): Width of the input images (note: likely a typo, should be 'input_width').
+            input_width (int): Width of the input images (note: likely a typo, should be 'input_width').
             input_height (int): Height of the input images.
             dim_linear (int): Number of units in the linear (fully connected) layer.
             width (int): Width parameter for the convolutional layers (e.g., number of filters).
@@ -45,7 +45,7 @@ class Conv4Layers(nn.Module):
 
         self.in_channels = in_channels
         self.input_height = input_height
-        self.input_width = input_wdith
+        self.input_width = input_width
         self.dim_out = dim_out
         self.linear_size = dim_linear
         self.width = width

@@ -1,4 +1,4 @@
-_target_: network.CNN4Layers
+_target_: network.Conv4Layers
 in_channels: 1
 dim_out: 10
 input_width: 28
