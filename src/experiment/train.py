@@ -34,7 +34,7 @@ def evaluate_split(split_name, dataloader, fabric, trainer, method, config):
     batch_results = []
 
     with torch.no_grad():
-        for batch_idx, (X, y) in enumerate(dataloader):
+        for batch_idx, (X, y) in enumerate(tqdm(dataloader)):
             X = fabric.to_device(X)
             y = fabric.to_device(y)
 
