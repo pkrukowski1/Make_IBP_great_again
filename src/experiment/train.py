@@ -64,9 +64,10 @@ def evaluate_split(split_name, dataloader, fabric, trainer, method, config):
 
             lb = int_output_bounds.lower
             ub = int_output_bounds.upper
-            output_bounds_length = torch.max(ub - lb, dim=-1).values.item()
+
+            output_bounds_length = torch.max(ub - lb, dim=-1).values.mean().item()
             verified = verify_point(int_output_bounds, y_pred_robust, y)
-            verified_points.extend([] if verified is None else [verified])
+            verified_points.extend(verified)
 
             batch_results.append({
                 "batch_idx": batch_idx,
@@ -74,6 +75,8 @@ def evaluate_split(split_name, dataloader, fabric, trainer, method, config):
                 "verified_point": verified,
                 "avg_time_per_image": avg_time_per_image
             })
+
+            break
 
     avg_loss = total_loss / total_samples
     accuracy = total_correct / total_samples
@@ -196,6 +199,8 @@ def run(config: DictConfig):
                 "train/bound_width_hist": wandb.Histogram(flat_bound_width)
             })
 
+            break
+
         avg_train_loss = epoch_loss / total_samples
         train_accuracy = total_correct / total_samples
 
@@ -238,6 +243,8 @@ def run(config: DictConfig):
             "val_avg_time_per_image": val_stats["overall_avg_time"],
             "val_verified_points": val_stats["overall_verified_points"]
         })
+
+        break
 
     test_stats = evaluate_split("test", test_loader, fabric, trainer, method, config)
 

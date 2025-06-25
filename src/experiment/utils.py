@@ -35,38 +35,49 @@ def get_dataloader(config: DictConfig, fabric, split: str = None) -> DataLoader:
     else:
         return fabric.setup_dataloaders(instantiate(config.dataset))
 
-def verify_point(output_bounds: Interval, y_pred: torch.Tensor, y_gt: torch.Tensor) -> float:
+def verify_point(output_bounds: Interval, y_pred: torch.Tensor, y_gt: torch.Tensor) -> torch.Tensor:
     """
-    Verifies whether the predicted label for a given point is robustly classified
-    based on the provided output bounds.
+    Verifies robust classification only for correctly predicted samples.
+
     Args:
-        output_bounds (Interval): An object representing the interval bounds of the
-            model's output logits. It should provide methods to access the midpoint,
-            lower bounds, and upper bounds of the logits.
-        y_pred (torch.Tensor): A tensor containing the predicted label for the
-            input point.
-        y_gt (torch.Tensor): A tensor containing the ground truth label for the
-            input point.
+        output_bounds (Interval): Contains `.lower` and `.upper` bounds (B x C).
+        y_pred (torch.Tensor): Predicted labels (B,).
+        y_gt (torch.Tensor): Ground truth labels (B,).
+
     Returns:
-        float: A verification result where 1.0 indicates that the point is verified.
+        torch.Tensor: Tensor of shape (N,), where N is the number of correct predictions.
+                      Values are 1.0 if verified, 0.0 if not.
     """
     with torch.no_grad():
+        lb = output_bounds.lower 
+        ub = output_bounds.upper
 
-        lower_bound = output_bounds.lower
-        upper_bound = output_bounds.upper
+        correct_mask = (y_pred == y_gt)
+        if correct_mask.sum() == 0:
+            return []
 
-        lower_bound = squeeze_batch_dim(lower_bound)
-        upper_bound = squeeze_batch_dim(upper_bound)
-        verified = None
-        
-        if y_pred == y_gt:
-            verified = 0.0
-            lower_bound_gt = lower_bound[y_pred]
-            upper_bound_non_gt = upper_bound[torch.arange(upper_bound.size(0), device=upper_bound.device) != y_pred]
-            if (lower_bound_gt > upper_bound_non_gt).all():
-                verified = 1.0
+        y_pred = y_pred[correct_mask]
+        y_gt = y_gt[correct_mask]
+        lb = lb[correct_mask]
+        ub = ub[correct_mask]
 
-        return verified
+        batch_size = lb.size(0)
+        idx = torch.arange(batch_size, device=lb.device)
+
+        gt_lb = lb[idx, y_gt]
+
+        # Mask out the correct class
+        non_gt_mask = torch.ones_like(ub, dtype=torch.bool)
+        non_gt_mask[idx, y_gt] = False
+        ub_non_gt = ub[non_gt_mask].view(batch_size, -1)
+
+        # Verified if ground truth lower bound is greater than all upper bounds of other classes
+        is_verified = (gt_lb.unsqueeze(1) > ub_non_gt).all(dim=1)
+       
+        return is_verified.float()
+
+
+
     
 def check_correct_prediction(module: nn.Module, x: torch.Tensor, y_gt: torch.Tensor) -> Tuple[bool,torch.Tensor]:
     """
@@ -81,9 +92,7 @@ def check_correct_prediction(module: nn.Module, x: torch.Tensor, y_gt: torch.Ten
     """
     y_pred = module(x)
     y_pred = torch.argmax(y_pred, dim=-1)
-    correctly_classified = False
-    if y_pred == y_gt:
-        correctly_classified = True
+    correctly_classified = y_pred == y_gt
     
     return correctly_classified, y_pred
     
