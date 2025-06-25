@@ -130,6 +130,8 @@ class AffineNN(MethodPluginABC):
 
                         relu_loss += error
                         relu_param_idx += 1
+                    else:
+                        affine_func, _ = affine_func.relu(None)
                 elif isinstance(layer, nn.Flatten):
                     affine_func = affine_func.flatten()
         return affine_func.to_interval(), relu_loss
@@ -376,62 +378,50 @@ class AffineFunc:
         return result
     
 
-    def relu(self, slope):
+    def relu(self, slope=None):
         c = self.to_interval()
+
+        eps = 1e-8
 
         mask1 = c <= 0
         mask2 = c >= 0
         mask3 = torch.logical_not(torch.logical_or(mask1, mask2))
 
-        e = slope
-        e = e[mask3]
-        a0 = self.coeffs[..., 0][mask3]
-        S = torch.sum(torch.abs(self.coeffs[..., 1:][mask3]), axis=-1)
+        if slope is not None:
+            e = slope
+        else:
+            denom = torch.where(c.diam() == 0, torch.tensor(eps, device=DEVICE), c.diam())
+            e = torch.clamp(c.upper / denom , max=torch.tensor(1.0, device=DEVICE))
+            e = 0.5*(1 - torch.cos(torch.pi*e))
+            e = 0.5*(1 - torch.cos(torch.pi*e))
+
+        a0 = self.coeffs[..., 0]
+        S = torch.sum(torch.abs(self.coeffs[..., 1:]), axis=-1)
+
+        # Avoid division by zero
+        safe_S = torch.where(S == 0, torch.tensor(eps, device=DEVICE), S)
 
         M = a0 + S
         B = 0.5 * e * M
-        c = B / S
-
-        D_min = torch.empty_like(e).to(device=DEVICE)
-        D_max = torch.empty_like(e).to(device=DEVICE)
-
-        # Case 0: e <= 0
-        cond0 = e <= 0
-
-        # Case 1: 0 < e < 1
-        cond1 = (e > 0) & (e < 1)
-
-        # Case 2: 1 <= e < 2*S/M
-        cond2 = (e >= 1) & (e < 2 * S / M)
-
-        # Case 3: e >= 2*S/M
-        cond3 = e >= 2 * S / M
-
-        D_min[cond0] = torch.zeros_like(e[cond0])
-        D_max[cond0] = (1 - e[cond0]) * M[cond0]
-
-        D_min[cond1] = torch.abs(B[cond1] - c[cond1] * a0[cond1])
-        D_max[cond1] = (1 - e[cond1]) * M[cond1]
-
-        D_min[cond2] = torch.abs(B[cond2] - c[cond2] * a0[cond2])
-        D_max[cond2] = torch.zeros_like(e[cond2])
-
-        D_min[cond3] = (1 - e[cond3]) * M[cond3]
-        D_max[cond3] = torch.zeros_like(e[cond3])
-            
+        c = B / safe_S
+        D = torch.abs(B - c * a0)
+      
         result = AffineFunc(shape=self.coeffs.shape, expr=self.expr)
-        result.coeffs[mask1] = 0.0
-        result.coeffs[mask2] = self.coeffs[mask2]
-        result.coeffs[mask3] = c.unsqueeze(-1) * self.coeffs[mask3]
-        result.coeffs[..., 0][mask3] = B
+        result.coeffs = c.unsqueeze(-1) * self.coeffs
+        result.coeffs[..., 0] = B
+        D = D[mask3]
+        e = e[mask3]
+        M = M[mask3]
         
-        i1 = Interval(-D_min, -D_min)
-        i2 = Interval(D_max, D_max)
+        i1 = Interval(-D, -D)
+        i2 = Interval((1-e)*M, (1-e)*M)
         hull_lower, hull_upper = interval_hull(i1, i2)
-        
-        error = (hull_upper - hull_lower).mean()
+        result.coeffs[mask1] *= 0.0
+        result.coeffs[mask2] = self.coeffs[mask2]
         result.add_var(Interval(hull_lower, hull_upper), mask3)
-        return result, error
+
+        relu_loss = (hull_upper - hull_lower).mean()
+        return result, relu_loss
     
     
     def softmax(self):
