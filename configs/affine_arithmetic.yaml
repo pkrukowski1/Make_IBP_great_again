@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - network: conv_small_cifar
-  - dataset: cifar10
+  - dataset: cifar_eran
   - method: composer_affine_arithmetic
   - exp: get_output_bounds
 
