@@ -160,12 +160,27 @@ def run(config: DictConfig):
             optimizer.step()
             optimizer.zero_grad()
 
-            epoch_loss += loss.item() * X.size(0)
-            total_samples += X.size(0)
-
+            # Compute predictions
             y_pred = torch.argmax(trainer.method.module(X), dim=1)
             correct = (y_pred == y).sum().item()
             total_correct += correct
+            batch_accuracy = correct / X.size(0)
+
+            # Robust verification
+            _, y_pred_robust = check_correct_prediction(trainer.method.module, X, y)
+            base_eps = torch.ones_like(X)
+            base_eps = fabric.to_device(base_eps)
+            eps = get_eps(config, base_eps)
+            int_output_bounds = trainer.method.forward(X, y, eps)
+
+            verified = verify_point(int_output_bounds, y_pred_robust, y)
+            robust_accuracy = torch.tensor(verified).sum().item() / X.size(0)
+
+            # Logging to console
+            print(f"[Batch {batch_idx+1}] Loss: {loss.item():.6f} | Acc: {batch_accuracy:.4f} | Robust Acc: {robust_accuracy:.4f}")
+
+            epoch_loss += loss.item() * X.size(0)
+            total_samples += X.size(0)
 
             bound_width = (bounds.upper - bounds.lower)
             avg_bound_width = bound_width.mean().item()
