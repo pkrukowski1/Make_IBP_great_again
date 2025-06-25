@@ -31,10 +31,9 @@ def evaluate_split(split_name, dataloader, fabric, trainer, method, config):
     all_bounds = []
     processing_times = []
     verified_points = []
-    batch_results = []
 
     with torch.no_grad():
-        for batch_idx, (X, y) in enumerate(tqdm(dataloader)):
+        for _, (X, y) in enumerate(tqdm(dataloader)):
             X = fabric.to_device(X)
             y = fabric.to_device(y)
 
@@ -62,19 +61,8 @@ def evaluate_split(split_name, dataloader, fabric, trainer, method, config):
             avg_time_per_image = batch_time / X.size(0)
             processing_times.append(avg_time_per_image)
 
-            lb = int_output_bounds.lower
-            ub = int_output_bounds.upper
-
-            output_bounds_length = torch.max(ub - lb, dim=-1).values.mean().item()
             verified = verify_point(int_output_bounds, y_pred_robust, y)
             verified_points.extend(verified)
-
-            batch_results.append({
-                "batch_idx": batch_idx,
-                "output_bounds_length": output_bounds_length,
-                "verified_point": verified,
-                "avg_time_per_image": avg_time_per_image
-            })
 
     avg_loss = total_loss / total_samples
     accuracy = total_correct / total_samples
@@ -110,7 +98,6 @@ def evaluate_split(split_name, dataloader, fabric, trainer, method, config):
         "min_bound_width": min_bound,
         "overall_avg_time": overall_avg_time,
         "overall_verified_points": overall_verified_points,
-        "batch_results": batch_results
     }
 
 
