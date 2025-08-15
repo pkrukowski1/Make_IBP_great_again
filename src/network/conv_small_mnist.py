@@ -4,11 +4,12 @@ import torch
 import logging
 
 from .utils import load_conv_model
+from .network_abc import NetworkABC
 
 log = logging.getLogger(__name__)
 
 
-class ConvSmallMNIST(nn.Module):
+class ConvSmallMNIST(NetworkABC):
     """
     A convolutional neural network model designed for small-scale image processing tasks.
     The model consists of a feature extractor using convolutional layers followed by a classifier.
@@ -19,7 +20,7 @@ class ConvSmallMNIST(nn.Module):
     Methods:
         __init__(dim_out: int, model_path: str = None):
             Initializes the ConvSmall model.
-        _build() -> nn.Sequential:
+        build() -> nn.Sequential:
             Builds the architecture of the ConvSmall model.
         forward(x: torch.Tensor) -> torch.Tensor:
             Defines the forward pass of the ConvSmall model.
@@ -40,7 +41,7 @@ class ConvSmallMNIST(nn.Module):
         self.input_width = 28
         self.dim_out = dim_out
 
-        self.model = self._build()
+        self.model = self.build()
 
         self.layer_outputs = {}
 
@@ -53,14 +54,7 @@ class ConvSmallMNIST(nn.Module):
             load_conv_model(self.model, model_path)
             log.info(f"Model loaded from {model_path}")
 
-    
-    def register_hooks(self, m):
-        def hook_fn(module, input, output):
-            self.layer_outputs[module] = output.shape[1:]  # Exclude batch dim
-        if isinstance(m, (nn.Conv2d, nn.Linear)):
-            m.register_forward_hook(hook_fn)
-
-    def _build(self) -> nn.Sequential:
+    def build(self) -> nn.Sequential:
         """
         Builds the architecture of the ConvSmall model as a single flat nn.Sequential.
         Returns:

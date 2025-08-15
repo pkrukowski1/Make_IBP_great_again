@@ -6,6 +6,7 @@ import torch
 
 from method.method_plugin_abc import MethodPluginABC
 from method.interval_arithmetic import Interval
+from network.network_abc import NetworkABC
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -16,18 +17,18 @@ class Composer:
     Each plugin is expected to implement the `MethodPluginABC` interface and can modify the behavior of the 
     module during the forward pass.
     Attributes:
-        module (nn.Module): The neural network module to which plugins are applied.
+        module (NetworkABC): The neural network module to which plugins are applied.
         plugins (Optional[list[MethodPluginABC]]): A list of plugins that modify the behavior of the module. 
             Defaults to an empty list.
     Methods:
-        __init__(module: nn.Module, plugins: Optional[list[MethodPluginABC]] = []):
+        __init__(NetworkABC, plugins: Optional[list[MethodPluginABC]] = []):
             Initializes the Composer with a module and an optional list of plugins. 
             Each plugin is associated with the module.
         forward(x: torch.Tensor, y: torch.Tensor) -> Interval:
             Executes the forward pass through the module and applies each plugin in sequence.
     """
     def __init__(self, 
-        module: nn.Module,
+        module: NetworkABC,
         plugins: Optional[list[MethodPluginABC]]=[]
     ) -> None:
 

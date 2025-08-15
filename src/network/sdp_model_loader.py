@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import logging
 
+from .network_abc import NetworkABC
+
 log = logging.getLogger(__name__)
 
 from network.sdp_models_archs import (
@@ -32,12 +34,12 @@ ARCH_CONSTRUCTORS = {
 }
 
 
-class SDPModelLoader(nn.Module):
+class SDPModelLoader(NetworkABC):
     """
     Loads and introspects an SDP model from file.
 
     Attributes:
-        model (nn.Module): The loaded model.
+        model (NetworkABC): The loaded model.
         layer_outputs (dict): Dictionary mapping layers to their output shapes (excluding batch dim).
     """
 
@@ -86,16 +88,6 @@ class SDPModelLoader(nn.Module):
         with torch.no_grad():
             dummy_input = torch.zeros(self.input_shape)
             self.model(dummy_input)
-
-    def register_hooks(self, module):
-        """
-        Registers forward hook on Conv2d and Linear layers to capture output shapes.
-        """
-        def hook_fn(m, input, output):
-            self.layer_outputs[m] = output.shape[1:]  # Exclude batch dim
-
-        if isinstance(module, (nn.Conv2d, nn.Linear)):
-            module.register_forward_hook(hook_fn)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)

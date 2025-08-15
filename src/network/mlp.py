@@ -5,11 +5,12 @@ import logging
 import torch
 
 from .utils import load_linear_model
+from .network_abc import NetworkABC
 
 log = logging.getLogger(__name__)
 
 
-class MLP(nn.Module):
+class MLP(NetworkABC):
     """
     A Multi-Layer Perceptron (MLP) implemented as a PyTorch module.
     This class constructs a feedforward neural network with a specified number of layers
@@ -22,7 +23,7 @@ class MLP(nn.Module):
     Methods:
         __init__(layers: List[int], activation_fnc: Callable):
             Initializes the MLP with the specified layers and activation function.
-        _build(layers: List[int], activation_fnc: Callable) -> nn.Sequential:
+        build(layers: List[int], activation_fnc: Callable) -> nn.Sequential:
             Constructs the sequential model based on the provided layers and activation function.
         forward(x):
             Performs a forward pass through the MLP.
@@ -52,13 +53,13 @@ class MLP(nn.Module):
         """
 
         super().__init__()
-        self.model = self._build(layers, activation_fnc)
+        self.model = self.build(layers, activation_fnc)
 
         if model_path is not None:
             load_linear_model(self.model, model_path)
             log.info(f"Model loaded from {model_path}")
 
-    def _build(self, layers: List[int], activation_fnc: Callable) -> nn.Sequential:
+    def build(self, layers: List[int], activation_fnc: Callable) -> nn.Sequential:
         """
         Constructs a sequential neural network model based on the specified layer sizes and activation function.
         Args:

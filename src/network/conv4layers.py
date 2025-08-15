@@ -3,9 +3,11 @@ import torch
 
 import logging
 
+from .network_abc import NetworkABC
+
 log = logging.getLogger(__name__)
 
-class Conv4Layers(nn.Module):
+class Conv4Layers(NetworkABC):
         
     def __init__(
             self, 
@@ -32,7 +34,7 @@ class Conv4Layers(nn.Module):
             input_height (int): Stores the input image height.
             input_width (int): Stores the input image width.
             dim_out (int): Stores the output dimension.
-            model (nn.Module): The constructed sequential model.
+            model (NetworkABC): The constructed sequential model.
             layer_outputs (dict): Dictionary to store outputs of layers for debugging or analysis.
             width (int): Width of the convolutional layers.
             linear_size (int): Size of the linear layer after the convolutional layers.
@@ -50,7 +52,7 @@ class Conv4Layers(nn.Module):
         self.width = width
         self.linear_size = linear_size
 
-        self.model = self._build()
+        self.model = self.build()
 
         self.layer_outputs = {}
 
@@ -59,14 +61,7 @@ class Conv4Layers(nn.Module):
             dummy_input = torch.zeros(1, self.in_channels, self.input_height, self.input_width)  # Just once, at model level
             self.model(dummy_input)
 
-    
-    def register_hooks(self, m):
-        def hook_fn(module, input, output):
-            self.layer_outputs[module] = output.shape[1:]  # Exclude batch dim
-        if isinstance(m, (nn.Conv2d, nn.Linear)):
-            m.register_forward_hook(hook_fn)
-
-    def _build(self) -> nn.Sequential:
+    def build(self) -> nn.Sequential:
         """
         Builds the architecture of the Conv4Layers model as a single flat nn.Sequential.
         Returns:

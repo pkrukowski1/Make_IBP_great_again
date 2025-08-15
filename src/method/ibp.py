@@ -7,6 +7,7 @@ import logging
 
 from method.method_plugin_abc import MethodPluginABC
 from method.interval_arithmetic import Interval
+from network.network_abc import NetworkABC
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -19,7 +20,7 @@ class IBP(MethodPluginABC):
     through a given neural network module. It supports a variety of common layer types 
     and applies specific interval propagation logic for each supported layer.
     Attributes:
-        module (nn.Module): The neural network module through which intervals will be propagated.
+        module (NetworkABC): The neural network module through which intervals will be propagated.
         epsilon (float): The perturbation scaling factor.
     Methods:
         __init__(epsilon: float) -> None:

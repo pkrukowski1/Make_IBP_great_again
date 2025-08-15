@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
@@ -10,6 +9,7 @@ from typing import Tuple
 
 from method.interval_arithmetic import Interval
 from method.method_plugin_abc import MethodPluginABC
+from network.network_abc import NetworkABC
 
 from omegaconf import DictConfig
 from hydra.utils import instantiate
@@ -79,11 +79,11 @@ def verify_point(output_bounds: Interval, y_pred: torch.Tensor, y_gt: torch.Tens
 
 
     
-def check_correct_prediction(module: nn.Module, x: torch.Tensor, y_gt: torch.Tensor) -> Tuple[bool,torch.Tensor]:
+def check_correct_prediction(module: NetworkABC, x: torch.Tensor, y_gt: torch.Tensor) -> Tuple[bool,torch.Tensor]:
     """
     Checks whether a given neural network module correctly classifies an input tensor.
     Args:
-        module (nn.Module): The neural network module to evaluate.
+        module (NetworkABC): The neural network module to evaluate.
         x (torch.Tensor): The input tensor to be classified by the module.
         y_gt (torch.Tensor): The ground truth tensor representing the correct classification.
     Returns: Tuple

@@ -1,7 +1,6 @@
 from abc import ABCMeta, abstractmethod
 
-from torch import nn
-
+from network.network_abc import NetworkABC
 
 class MethodPluginABC(metaclass=ABCMeta):    
     """
@@ -9,21 +8,21 @@ class MethodPluginABC(metaclass=ABCMeta):
     This class defines the interface for plugins that can be attached to a neural 
     network module and perform specific operations during the forward pass.
     Methods:
-        set_module(module: nn.Module):
+        set_module(module: NetworkABC):
             Sets the neural network module for the plugin to operate on.
         forward(x,y,eps):
             Abstract method that defines the internal forward pass logic. 
             Must be implemented by subclasses.
     Attributes:
-        module (nn.Module):
+        module (NetworkABC):
             The neural network module associated with the plugin.
     """
-    def set_module(self, module: nn.Module) -> None:
+    def set_module(self, module: NetworkABC) -> None:
         """
         Set the module for the plugin.
         
         Args:
-            module(nn.Module): The model to be set.
+            module (NetworkABC): The model to be set.
         """
 
         self.module = module

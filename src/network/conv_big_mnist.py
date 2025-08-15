@@ -4,11 +4,12 @@ import torch
 import logging
 
 from .utils import load_conv_model
+from .network_abc import NetworkABC
 
 log = logging.getLogger(__name__)
 
 
-class ConvBigMNIST(nn.Module):
+class ConvBigMNIST(NetworkABC):
     """
     ConvBigMNIST: A convolutional neural network model for feature extraction and classification.
     This class defines a convolutional neural network with multiple convolutional layers 
@@ -23,7 +24,7 @@ class ConvBigMNIST(nn.Module):
         __init__(dim_out: int, model_path: str = None):
             Initializes the ConvBigMNIST model with the specified input channels, output dimensions, 
             and an optional path to a pre-trained model.
-        _build() -> nn.Sequential:
+        build() -> nn.Sequential:
             Constructs the feature extractor and classifier components of the model. Dynamically 
             determines the number of features after flattening to configure the fully connected layers.
         forward(x: torch.Tensor) -> torch.Tensor:
@@ -37,7 +38,7 @@ class ConvBigMNIST(nn.Module):
             dim_out (int): The dimensionality of the output.
             model_path (str, optional): Path to a pre-trained model to load. Defaults to None.
         Attributes:
-            model (nn.Module): The neural network model built by `_build` method.
+            model (NetworkABC): The neural network model built by `build` method.
             in_channels (int): The number of input channels for the model.
             dim_out (int): The dimensionality of the output.
         Side Effects:
@@ -50,7 +51,7 @@ class ConvBigMNIST(nn.Module):
         self.input_width = 28
         self.dim_out = dim_out
 
-        self.model = self._build()
+        self.model = self.build()
         self.layer_outputs = {}
 
         self.model.apply(self.register_hooks)
@@ -62,7 +63,7 @@ class ConvBigMNIST(nn.Module):
             load_conv_model(self.model, model_path)
             log.info(f"Model loaded from {model_path}")
 
-    def _build(self) -> nn.Sequential:
+    def build(self) -> nn.Sequential:
         """
         Builds a neural network model consisting of a feature extractor and a classifier.
         The feature extractor is a sequence of convolutional layers with ReLU activations,
@@ -107,12 +108,6 @@ class ConvBigMNIST(nn.Module):
         all_layers = feature_layers + classifier
 
         return nn.Sequential(*all_layers)
-    
-    def register_hooks(self, m):
-        def hook_fn(module, input, output):
-            self.layer_outputs[module] = output.shape[1:]  # Exclude batch dim
-        if isinstance(m, (nn.Conv2d, nn.Linear)):
-            m.register_forward_hook(hook_fn)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

@@ -5,7 +5,7 @@ def load_linear_model(model: nn.Module, weight_path: str, device: str = "cpu") -
     """
     Loads the weights of an MLP model from a specified file path.
     Args:
-        model (nn.Module): The PyTorch model instance to load the weights into.
+        model (NetworkABC): The PyTorch model instance to load the weights into.
         weight_path (str): The file path to the saved model weights.
         device (str, optional): The device to map the model weights to. Defaults to "cpu".
     Notes:
@@ -30,7 +30,7 @@ def load_conv_model(model: nn.Module, weight_path: str, device: str = "cpu") -> 
     """
     Loads the weights of a CNN model from a specified file path.
     Args:
-        model (nn.Module): The PyTorch model instance to load the weights into.
+        model (NetworkABC): The PyTorch model instance to load the weights into.
         weight_path (str): The file path to the saved model weights.
         device (str, optional): The device to map the model weights to. Defaults to "cpu".
     Notes:
