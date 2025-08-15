@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - network: conv_small_b
+  - network: conv4layers
   - dataset: mnist
   - method: composer_affine_arithmetic
   - exp: train
