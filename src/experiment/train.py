@@ -124,8 +124,8 @@ def run(config: DictConfig):
     log.info(f'Initializing the trainer')
     trainer = Trainer(
         method=method,
-        start_epoch=config.training.start_warmup_epoch,
-        end_epoch=config.training.end_warmup_epoch,
+        warmup_start_epoch=config.training.warmup_start_epoch,
+        warmup_end_epoch=config.training.warmup_end_epoch,
         schedule_epochs=config.training.schedule_epochs_after_warmup,
         num_batches_per_epoch=len(train_loader)
     )

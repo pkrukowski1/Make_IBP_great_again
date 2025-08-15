@@ -105,8 +105,6 @@ class AffineNN(MethodPluginABC):
             - The accumulated ReLU error is weighted by the layer index to prioritize earlier layers.
         """
         
-        # WARNING: This method assumes that the input x is a single batch of data.
-        # If x is a batch, we need to squeeze it to get the first element.
         epsilon = self.epsilon * eps
         zl, zu = x - epsilon, x + epsilon
         expr = AffineExpr()

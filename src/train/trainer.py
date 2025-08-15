@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 import logging
 from typing import Tuple
 
@@ -21,8 +22,8 @@ class Trainer:
     def __init__(
         self,
         method: MethodPluginABC,
-        start_epoch: int = 0,
-        end_epoch: int = 100,
+        warmup_start_epoch: int = 0,
+        warmup_end_epoch: int = 100,
         schedule_epochs: int = 10,
         num_batches_per_epoch: int = 100,
     ) -> None:
@@ -31,8 +32,8 @@ class Trainer:
 
         Args:
             method (MethodPluginABC): The training method (plugin) with an interval bound forward pass.
-            start_epoch (int): The first epoch (inclusive) of the warmup phase.
-            end_epoch (int): The last epoch (exclusive) of the warmup phase.
+            warmup_start_epoch (int): The first epoch (inclusive) of the warmup phase.
+            warmup_end_epoch (int): The last epoch (exclusive) of the warmup phase.
             schedule_epochs (int): Number of epochs to linearly schedule epsilon and kappa after warmup.
             num_batches_per_epoch (int): Number of batches per training epoch.
         """
@@ -42,8 +43,8 @@ class Trainer:
         self.current_epsilon = 0.0
         self.current_kappa = 1.0
 
-        self.start_epoch = start_epoch
-        self.end_epoch = end_epoch
+        self.warmup_start_epoch = warmup_start_epoch
+        self.warmup_end_epoch = warmup_end_epoch
         self.schedule_epochs = schedule_epochs
         self.num_batches_per_epoch = num_batches_per_epoch
 
@@ -65,7 +66,7 @@ class Trainer:
         self.current_epoch = epoch
         self.schedule_step = 0
 
-        if epoch < self.end_epoch:
+        if epoch < self.warmup_end_epoch:
             self.current_epsilon = 0.0
             self.current_kappa = 1.0
         elif self.schedule_total_steps == 0:
@@ -82,7 +83,7 @@ class Trainer:
         Updates epsilon and kappa linearly per batch during the scheduling phase.
         If warmup hasn't ended or schedule is complete, values remain static.
         """
-        if self.current_epoch < self.end_epoch:
+        if self.current_epoch < self.warmup_end_epoch:
             return  # warmup phase
 
         if self.schedule_step >= self.schedule_total_steps:
@@ -118,34 +119,43 @@ class Trainer:
 
     def calculate_loss(self, logits: torch.Tensor, bounds: Interval, y: torch.Tensor) -> torch.Tensor:
         """
-        Computes the mixed loss from natural and robust cross-entropy losses.
+        Mixed natural + robust cross-entropy loss using a CROWN-IBP-style
+        margin bound, computed without constructing the specification matrix.
 
         Args:
-            logits (torch.Tensor): Model outputs.
-            bounds (Interval): Interval bounds of the outputs.
-            y (torch.Tensor): Ground truth labels.
+            logits (torch.Tensor): Model outputs (natural forward pass), shape [B, C].
+            bounds (Interval): Interval bounds of the outputs with .lower and .upper, each [B, C].
+            y (torch.Tensor): Ground truth labels, shape [B].
 
         Returns:
             torch.Tensor: Combined loss.
         """
-        natural_loss = torch.nn.functional.cross_entropy(logits, y)
+        # ===== Natural loss =====
+        natural_loss = F.cross_entropy(logits, y)
 
-        lower = bounds.lower
-        upper = bounds.upper
+        lower, upper = bounds.lower, bounds.upper  # [B, C]
+        B, C = lower.shape
+        device = logits.device
 
-        batch_size = lower.size(0)
-        num_classes = lower.size(1)
+        # ===== Robust margin lower bounds for all j != y =====
+        # For each sample: margin_lower_j = lower_y - upper_j
+        arange = torch.arange(B, device=device)
+        lower_y = lower[arange, y]                       # [B]
+        margin_left = lower_y.unsqueeze(1)               # [B, 1]
 
-        true_class_lower = lower[torch.arange(batch_size), y]
+        # Collect upper bounds of all *other* classes
         mask = torch.ones_like(upper, dtype=torch.bool)
-        mask[torch.arange(batch_size), y] = False
-        worst_other_upper = upper[mask].view(batch_size, num_classes - 1).max(dim=1)[0]
+        mask[arange, y] = False
+        upper_others = upper[mask].view(B, C - 1)        # [B, C-1]
 
-        margins = true_class_lower - worst_other_upper
-        margin_logits = torch.stack([margins, torch.zeros_like(margins)], dim=1)
-        targets = torch.zeros(batch_size, dtype=torch.long, device=logits.device)
+        margin_lower = margin_left - upper_others        # [B, C-1]
 
-        robust_loss = torch.nn.functional.cross_entropy(margin_logits, targets)
+        # ===== Robust loss (CE over logits [0, -margin_lower]) =====
+        # CE(z, y) = logsumexp(0, -m_j) with target=0
+        robust_logits = torch.cat([torch.zeros(B, 1, device=device), -margin_lower], dim=1)  # [B, C]
+        robust_targets = torch.zeros(B, dtype=torch.long, device=device)
+        robust_loss = F.cross_entropy(robust_logits, robust_targets)
+
+        # ===== Mix losses =====
         loss = self.current_kappa * natural_loss + (1.0 - self.current_kappa) * robust_loss
-
         return loss
