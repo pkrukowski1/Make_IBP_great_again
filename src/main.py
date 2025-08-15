@@ -1,5 +1,3 @@
-import shutil
-
 import pyrootutils
 
 from omegaconf import DictConfig
