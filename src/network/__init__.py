@@ -1,10 +1,9 @@
-# Pretrained
-from .mlp import MLP
-from .conv_small_mnist import ConvSmallMNIST
-from .conv_big_mnist import ConvBigMNIST
-from .conv_small_cifar import ConvSmallCIFAR
-from .conv_big_cifar import ConvBigCIFAR
-from .sdp_model_loader import SDPModelLoader
+from .alpha_crown_model_defs.mlp import MLP
+from .alpha_crown_model_defs.conv_small_mnist import ConvSmallMNIST
+from .alpha_crown_model_defs.conv_big_mnist import ConvBigMNIST
+from .alpha_crown_model_defs.conv_small_cifar import ConvSmallCIFAR
+from .alpha_crown_model_defs.conv_big_cifar import ConvBigCIFAR
+from .alpha_crown_model_defs.sdp_model_loader import SDPModelLoader
 
-# To train from scratch
-from .conv4layers import Conv4Layers
+from .crown_ibp_model_defs.conv4layers import Conv4Layers
+from .crown_ibp_model_defs.dm_small import DMSmall

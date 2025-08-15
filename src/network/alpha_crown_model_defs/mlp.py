@@ -4,8 +4,8 @@ import logging
 
 import torch
 
-from .utils import load_linear_model
-from .network_abc import NetworkABC
+from network.utils import load_linear_model
+from network.network_abc import NetworkABC
 
 log = logging.getLogger(__name__)
 

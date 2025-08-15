@@ -3,11 +3,11 @@ import torch
 import torch.nn as nn
 import logging
 
-from .network_abc import NetworkABC
+from network.network_abc import NetworkABC
 
 log = logging.getLogger(__name__)
 
-from network.sdp_models_archs import (
+from .sdp_models_archs import (
     cnn_4layer,
     cnn_4layer_adv,
     cnn_4layer_adv4,

@@ -1,8 +1,7 @@
-*/__pycache__
 .vscode/
 data/cifar10
 data/mnist
 .env
-*/*/__pycache__
 outputs
 wandb
+__pycache__/
