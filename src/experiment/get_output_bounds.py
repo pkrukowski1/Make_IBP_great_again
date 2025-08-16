@@ -44,7 +44,7 @@ def run(config: DictConfig):
         
         _, y_pred = check_correct_prediction(method.module, X, y)
 
-        eps = get_eps(config, shape=X.shape, device=X.device)
+        eps = config.exp.epsilon * get_eps(config, shape=X.shape, device=X.device)
 
         start_time = time.time()
         

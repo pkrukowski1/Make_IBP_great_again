@@ -145,7 +145,7 @@ def get_eps(config: DictConfig, shape: Tuple[int,...], device: torch.device) -> 
             is defined, the epsilon tensor is divided by it. Otherwise, the original
             epsilon tensor is returned unchanged.
     """
-    eps = config.exp.epsilon * torch.ones(shape, device=device)
+    eps = torch.ones(shape, device=device)
     if hasattr(config.dataset.dataset, "std"):
         std = config.dataset.dataset.std
         std = torch.tensor(std, device=eps.device).view(1, 3, 1, 1)

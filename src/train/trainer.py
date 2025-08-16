@@ -97,7 +97,7 @@ class Trainer:
         Returns:
             Tuple[torch.Tensor, Interval]: Loss and interval bounds for the batch.
         """
-        eps = get_eps(config, shape=x.shape, device=x.device)
+        eps = self.current_epsilon * get_eps(config, shape=x.shape, device=x.device)
         out_bounds = self.method.forward(x, y, eps)
         logits = self.method.module(x)
         loss = self.calculate_loss(logits, out_bounds, y)
