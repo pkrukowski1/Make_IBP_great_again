@@ -1,10 +1,12 @@
 import torch
 import torch.nn.functional as F
 import logging
+from omegaconf import DictConfig
 from typing import Tuple
 
 from method.interval_arithmetic import Interval
 from method.method_plugin_abc import MethodPluginABC
+from experiment.utils import get_eps
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -75,7 +77,7 @@ class Trainer:
                 f"kappa = {self.current_kappa:.5f}")
 
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, Interval]:
+    def forward(self, x: torch.Tensor, y: torch.Tensor, config: DictConfig) -> Tuple[torch.Tensor, Interval]:
         """
         Performs a forward pass using the current epsilon, computes robust interval bounds,
         and returns the loss and bounds.
@@ -83,11 +85,15 @@ class Trainer:
         Args:
             x (torch.Tensor): Input batch.
             y (torch.Tensor): Ground truth labels.
+            config (DictConfig): The configuration object containing dataset information.
+                It is expected to have a nested structure where `config.dataset.dataset.std`
+                holds the standard deviation values as a list or tensor.
 
         Returns:
             Tuple[torch.Tensor, Interval]: Loss and interval bounds for the batch.
         """
-        eps = torch.ones_like(x, device=x.device)
+        base_eps = torch.ones_like(x, device=x.device)
+        eps = get_eps(config, base_eps)
         out_bounds = self.method.forward(x, y, eps)
         logits = self.method.module(x)
         loss = self.calculate_loss(logits, out_bounds, y)

@@ -30,6 +30,7 @@ def evaluate_split(
     fabric: Fabric,
     trainer: Trainer,
     method: MethodPluginABC,
+    config: DictConfig
 ) -> Dict[str, float]:
     """
     Evaluate model performance on a given dataset split, logging both
@@ -53,7 +54,7 @@ def evaluate_split(
             y = fabric.to_device(y)
 
             # Forward pass to get natural loss and bounds
-            loss, bounds = trainer.forward(X, y)
+            loss, bounds = trainer.forward(X, y, config)
             total_loss += loss.item() * X.size(0)
             total_samples += X.size(0)
 
@@ -210,7 +211,7 @@ def run(config: DictConfig) -> None:
 
             start_time = time.time()
 
-            loss, bounds = trainer.forward(X, y)
+            loss, bounds = trainer.forward(X, y, config)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -276,7 +277,7 @@ def run(config: DictConfig) -> None:
             scheduler.step(avg_train_loss)
 
         # Validation
-        val_stats = evaluate_split("val", val_loader, fabric, trainer, method)
+        val_stats = evaluate_split("val", val_loader, fabric, trainer, method, config)
 
         # Save best model
         if val_stats["avg_loss"] < best_val_loss:
@@ -322,7 +323,7 @@ def run(config: DictConfig) -> None:
         })
 
     # Test evaluation
-    test_stats = evaluate_split("test", test_loader, fabric, trainer, method)
+    test_stats = evaluate_split("test", test_loader, fabric, trainer, method, config)
 
     total_time = np.sum(processing_times)
     wandb.log({
