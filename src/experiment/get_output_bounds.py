@@ -65,7 +65,13 @@ def run(config: DictConfig):
         output_bounds_length = torch.max(ub - lb, dim=-1).values.item()
         verified = verify_point(int_output_bounds, y_pred, y)
         print(f"Batch {batch_idx+1}, Verified: {verified}")
-        verified_points.extend([] if verified is None else [verified])
+
+        # Normalize verified outputs into 0/1 values
+        if verified is not None:
+            if isinstance(verified, (list, np.ndarray, torch.Tensor)):
+                verified_points.extend([int(bool(v)) for v in verified])
+            else:
+                verified_points.append(int(bool(verified)))
         
         # Log to wandb
         wandb.log({
@@ -79,14 +85,18 @@ def run(config: DictConfig):
         # Collect batch metrics
         batch_results.append({
             "batch_idx": batch_idx,
-            "output_bounds_length": output_bounds_length,
-            "verified_point": verified,
-            "avg_time_per_image": avg_time_per_image
-            })
+            "output_bounds_length": float(output_bounds_length),
+            "verified_point": (
+                verified.detach().cpu().item() if isinstance(verified, torch.Tensor)
+                else bool(verified) if verified is not None
+                else None
+            ),
+            "avg_time_per_image": float(avg_time_per_image)
+        })
             
     # Calculate overall metrics
     overall_avg_time = np.mean(processing_times)
-    overall_verified_points = np.sum(verified_points) / len(dataloader)
+    overall_verified_points = np.mean(verified_points) if verified_points else 0.0
     wandb.log({
         "overall_avg_processing_time_per_image": overall_avg_time,
         "overall_verified_points": overall_verified_points
