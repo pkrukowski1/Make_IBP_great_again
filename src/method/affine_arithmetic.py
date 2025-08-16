@@ -20,13 +20,12 @@ class AffineNN(MethodPluginABC):
     and gradient-based optimization.
     
     Attributes:
-        epsilon (float): The perturbation scaling factor.
         optimize_bounds (bool): Flag indicating whether to optimize bounds using gradient-based methods.
         gradient_iter (int): Number of gradient iterations for optimizing bounds (required if optimize_bounds is True).
         lr (float): Learning rate for the optimizer used in bounds optimization.
 
     Methods:
-        __init__(epsilon: float, optimize_bounds: bool, gradient_iter: int = 0, lr: float = 0.1):
+        __init__(optimize_bounds: bool, gradient_iter: int = 0, lr: float = 0.1):
             Initializes the AffineNN object with the given parameters.
         get_bounds(x: torch.Tensor, eps: torch.Tensor) -> Interval:
             Computes the affine arithmetic bounds for the input tensor `x` with perturbation `eps`.
@@ -60,15 +59,13 @@ class AffineNN(MethodPluginABC):
                 Interval: The computed interval bounds after the forward pass.
     """
 
-    def __init__(self, epsilon: float,
-                 optimize_bounds: bool, 
+    def __init__(self, optimize_bounds: bool, 
                  gradient_iter: int = 0,
                  lr: float = 0.1,
                  ):
         
         super().__init__()
 
-        self.epsilon = epsilon
         self.optimize_bounds = optimize_bounds
 
         if optimize_bounds and gradient_iter == 0:
@@ -91,8 +88,7 @@ class AffineNN(MethodPluginABC):
 
             x (torch.Tensor): The center value of the input interval. Assumes the input is a single batch of data.
                               If the input is batched, it will be squeezed to extract the first element.
-           eps (torch.Tensor): A tensor representing the perturbation range. The final radii
-                for the perturbation are computed as `self.epsilon * eps`.
+           eps (torch.Tensor): A tensor representing the perturbation.
 
             Tuple[Interval, float]:
                 - Interval: The resulting interval bounds after propagating through the network.
@@ -100,13 +96,11 @@ class AffineNN(MethodPluginABC):
 
 
         Notes:
-            - This method assumes that the input `x` is a single batch of data. If `x` is a batch, it will be squeezed.
             - The method tracks learnable ReLU parameters using `self.slope_relu_params` when `self.optimize_bounds` is enabled.
             - The accumulated ReLU error is weighted by the layer index to prioritize earlier layers.
         """
         
-        epsilon = self.epsilon * eps
-        zl, zu = x - epsilon, x + epsilon
+        zl, zu = x - eps, x + eps
         expr = AffineExpr()
         interval = Interval(zl, zu)
         affine_func = expr.new_tensor(interval)
@@ -154,8 +148,7 @@ class AffineNN(MethodPluginABC):
         Performs a single gradient descent step for optimizing the model.
         Args:
             x (torch.Tensor): Input tensor for the model.
-            eps (torch.Tensor): A tensor representing the perturbation range. The final radii
-                for the perturbation are computed as `self.epsilon * eps`.
+            eps (torch.Tensor): A tensor representing the perturbation.
         Returns:
             loss (float): Total value of used loss function.
         Description:
@@ -185,14 +178,13 @@ class AffineNN(MethodPluginABC):
 
         return total_loss.item()
     
-    def forward(self, x, y, eps: torch.Tensor):
+    def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
         """
         Performs the forward pass for affine arithmetic calculations.
         Args:
             x (torch.Tensor): The input tensor for the affine arithmetic computation.
             y (torch.Tensor): The target or auxiliary tensor used in the computation.
-            eps (torch.Tensor): A tensor representing the perturbation range. The final radii
-                for the perturbation are computed as `self.epsilon * eps`.
+            eps (torch.Tensor): A tensor representing the perturbation.
         Returns:
             torch.Tensor: The computed bounds after applying affine arithmetic.
         Notes:

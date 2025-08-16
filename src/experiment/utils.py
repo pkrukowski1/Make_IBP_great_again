@@ -128,7 +128,7 @@ def save_deteriotated_image(x: torch.Tensor, flatten: bool, folder: str,
         img_path = f"{folder}/deteriorated_images/image_{uuid.uuid4().hex[:8]}.png"
     img.save(img_path)
 
-def get_eps(config: DictConfig, eps: torch.Tensor) -> torch.Tensor:
+def get_eps(config: DictConfig, shape: Tuple[int,...], device: torch.device) -> torch.Tensor:
     """
     Adjusts the epsilon tensor by dividing it by the dataset's standard deviation
     if the standard deviation is defined in the dataset configuration.
@@ -137,14 +137,15 @@ def get_eps(config: DictConfig, eps: torch.Tensor) -> torch.Tensor:
         config (DictConfig): The configuration object containing dataset information.
             It is expected to have a nested structure where `config.dataset.dataset.std`
             holds the standard deviation values as a list or tensor.
-        eps (torch.Tensor): The epsilon tensor to be adjusted. Typically represents
-            perturbation bounds in adversarial training or similar contexts.
+        shape (Tuple[int,...]): The shape of the epsilon tensor to be created.
+        device (torch.device): The device on which the tensor should be created.
 
     Returns:
         torch.Tensor: The adjusted epsilon tensor. If the dataset's standard deviation
             is defined, the epsilon tensor is divided by it. Otherwise, the original
             epsilon tensor is returned unchanged.
     """
+    eps = torch.ones(shape, device=device)
     if hasattr(config.dataset.dataset, "std"):
         std = config.dataset.dataset.std
         std = torch.tensor(std, device=eps.device).view(1, 3, 1, 1)

@@ -43,10 +43,8 @@ def run(config: DictConfig):
         y = fabric.to_device(y)
         
         _, y_pred = check_correct_prediction(method.module, X, y)
-        base_eps = torch.ones_like(X)
-        base_eps = fabric.to_device(base_eps)
 
-        eps = get_eps(config, base_eps)
+        eps = get_eps(config, shape=X.shape, device=X.device)
 
         start_time = time.time()
         

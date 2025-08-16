@@ -11,6 +11,9 @@ training:
   epochs: 200
   lr: 0.0005
   use_scheduler: False
+  kappa_end: 0.5
+  eps_train: 0.2
+  eps_test: 0.1
 
 fabric:
   _target_: lightning.Fabric

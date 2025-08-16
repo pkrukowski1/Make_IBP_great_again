@@ -11,11 +11,11 @@ from hydra.utils import instantiate
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from lightning.fabric import Fabric
-from typing import Any, Dict
+from typing import Dict
 
 from utils.fabric import setup_fabric
 from utils.hydra import extract_output_dir
-from experiment.utils import get_eps, compute_verified_error, pgd_linf_attack
+from experiment.utils import compute_verified_error, pgd_linf_attack
 from dataset.factory import DatasetFactory
 from method.method_plugin_abc import MethodPluginABC
 from train import Trainer
@@ -68,7 +68,7 @@ def evaluate_split(
             total_verified_error.append(verified_err_batch)
 
             # PGD-200 attack
-            adv_x = pgd_linf_attack(method.module, X, y, eps=trainer.method.epsilon, steps=200)
+            adv_x = pgd_linf_attack(method.module, X, y, eps=trainer.epsilon_train, steps=200 if split_name == "test" else 1)
             y_pred_pgd = torch.argmax(method.module(adv_x), dim=1)
             total_pgd_wrong += (y_pred_pgd != y).sum().item()
 
@@ -174,6 +174,7 @@ def run(config: DictConfig) -> None:
     log.info(f'Initializing the trainer')
     trainer = Trainer(
         method=method,
+        eps_train=config.training.eps_train,
         warmup_epochs=config.training.warmup_epochs,
         schedule_epochs=config.training.schedule_epochs_after_warmup,
         num_batches_per_epoch=len(train_loader)
@@ -230,7 +231,7 @@ def run(config: DictConfig) -> None:
             total_verified_error.append(verified_err_batch)
 
             # PGD error (batch)
-            adv_x = pgd_linf_attack(trainer.method.module, X, y, eps=trainer.method.epsilon, steps=200)
+            adv_x = pgd_linf_attack(trainer.method.module, X, y, eps=trainer.epsilon_train, steps=1)
             y_pred_pgd = torch.argmax(trainer.method.module(adv_x), dim=1)
             total_pgd_wrong += (y_pred_pgd != y).sum().item()
 

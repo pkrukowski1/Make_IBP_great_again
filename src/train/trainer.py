@@ -24,22 +24,28 @@ class Trainer:
     def __init__(
         self,
         method: MethodPluginABC,
+        eps_train: float,
         warmup_epochs: int = 0,
         schedule_epochs: int = 10,
         num_batches_per_epoch: int = 100,
+        kappa_end: float = 0.5
     ) -> None:
         """
         Initializes the Trainer.
 
         Args:
             method (MethodPluginABC): The training method (plugin) with an interval bound forward pass.
+            eps_train (float): The maximum epsilon value for training (non-scheduled).
             warmup_epochs (int): Number of warmup epochs.
             schedule_epochs (int): Number of epochs to linearly schedule epsilon and kappa after warmup.
             num_batches_per_epoch (int): Number of batches per training epoch.
+            kappa_end (float): The final value of kappa after the scheduling period.
         """
         super().__init__()
         self.method = method.plugins[0]
-        self.epsilon_train = self.method.epsilon
+        self.epsilon_train = eps_train
+        self.kappa_end = kappa_end
+
         self.current_epsilon = 0.0
         self.current_kappa = 1.0
 
@@ -65,14 +71,13 @@ class Trainer:
             self.current_kappa = 1.0
         elif self.schedule_total_steps == 0:
             self.current_epsilon = self.epsilon_train
-            self.current_kappa = 0.5
+            self.current_kappa = self.kappa_end
         else:
             progress = min(1.0, self.schedule_step / self.schedule_total_steps)
             self.current_epsilon = progress * self.epsilon_train
-            self.current_kappa = max(1.0 - progress, 0.5)
+            self.current_kappa = max(1.0 - progress, self.kappa_end)
             self.schedule_step += 1
 
-        self.method.epsilon = self.current_epsilon
         log.info(f"[Epoch {epoch}]: epsilon = {self.current_epsilon:.5f}, "
                 f"kappa = {self.current_kappa:.5f}")
 
@@ -92,8 +97,7 @@ class Trainer:
         Returns:
             Tuple[torch.Tensor, Interval]: Loss and interval bounds for the batch.
         """
-        base_eps = torch.ones_like(x, device=x.device)
-        eps = get_eps(config, base_eps)
+        eps = get_eps(config, shape=x.shape, device=x.device)
         out_bounds = self.method.forward(x, y, eps)
         logits = self.method.module(x)
         loss = self.calculate_loss(logits, out_bounds, y)

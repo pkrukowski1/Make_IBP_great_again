@@ -1,6 +1,9 @@
 from abc import ABCMeta, abstractmethod
 
+import torch
+
 from network.network_abc import NetworkABC
+from method.interval_arithmetic import Interval
 
 class MethodPluginABC(metaclass=ABCMeta):    
     """
@@ -28,7 +31,7 @@ class MethodPluginABC(metaclass=ABCMeta):
         self.module = module
 
     @abstractmethod
-    def forward(self, x, y, eps) -> None:
+    def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
         """
         Internal forward pass.
         """
