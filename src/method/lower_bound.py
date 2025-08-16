@@ -14,24 +14,21 @@ class LowerBound(MethodPluginABC):
     for a given input tensor within a specified epsilon neighborhood. It uses random sampling
     to estimate the bounds.
     Attributes:
-        epsilon (float): The perturbation scaling factor.
         num_points (int): The number of random points to sample within the epsilon neighborhood.
     Methods:
-        __init__(epsilon: float, num_points: int = 1000):
-            Initializes the LowerBound plugin with the specified input dimensionality,
-            epsilon radius, and number of sampling points.
+        __init__(num_points: int = 1000):
+            Initializes the LowerBound plugin with the specified input dimensionality and number of sampling points.
         forward(x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
             Computes the lower and upper bounds of the model's output for the given input tensor
             `x` within the epsilon neighborhood. Returns an Interval object containing the
             minimum and maximum bounds.
     """
 
-    def __init__(self, epsilon: float, num_points: int = 1000) -> None:
+    def __init__(self, num_points: int = 1000) -> None:
         """
         Initializes the lower bound method with the given parameters.
 
         Args:
-            epsilon (float): The epsilon value used for the bound calculation.
             num_points (int, optional): The number of points to use in the calculation. Defaults to 1000.
 
         Returns:
@@ -39,10 +36,9 @@ class LowerBound(MethodPluginABC):
         """
         super().__init__()
 
-        self.epsilon = epsilon
         self.num_points = num_points
 
-        log.info(f"Ideal bound plugin initialized for epsilon={self.epsilon}")
+        log.info(f"Ideal bound plugin initialized")
     
 
     def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
@@ -52,8 +48,7 @@ class LowerBound(MethodPluginABC):
         Args:
             x (torch.Tensor): The input tensor for which the interval bounds are to be computed.
             y (torch.Tensor): An additional input tensor (not used in this implementation).
-            eps (torch.Tensor): A tensor representing the perturbation range. The final radii
-                for the perturbation are computed as `self.epsilon * eps`.
+            eps (torch.Tensor): A tensor representing the perturbation range.
 
         Returns:
             Interval: An object containing the computed lower and upper bounds for the output.
@@ -63,8 +58,6 @@ class LowerBound(MethodPluginABC):
             - The module is evaluated in `eval` mode, and gradients are not computed during this process.
             - The lower and upper bounds of the output are determined by the minimum and maximum
               values of the module's outputs over the sampled points.
-            - The `eps` tensor allows for element-wise control of the perturbation range, enabling
-              more flexible interval computations.
         """
         self.module.eval()
         B = x.size(0)
@@ -72,7 +65,7 @@ class LowerBound(MethodPluginABC):
 
         # Expand each input to (num_points) versions
         x_expanded = x.unsqueeze(1).expand(B, self.num_points, *shape)  # (B, N, ...)
-        noise = (torch.rand_like(x_expanded) * 2 - 1) * self.epsilon * eps
+        noise = (torch.rand_like(x_expanded) * 2 - 1) * eps
         perturbed = x_expanded + noise
         perturbed = perturbed.view(-1, *shape)  # (B * N, ...)
 

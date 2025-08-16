@@ -5,3 +5,4 @@ data/mnist
 outputs
 wandb
 __pycache__/
+src/network/models

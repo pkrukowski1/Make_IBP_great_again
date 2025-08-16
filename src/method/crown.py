@@ -18,17 +18,14 @@ class CROWN(MethodPluginABC):
     certified bounds for neural network outputs under input perturbations.
 
     Attributes:
-        epsilon (float): The perturbation scaling factor.
         lirpa_model (BoundedModule or None): The model wrapped with bounds
             computation capabilities. Initialized lazily during the first forward pass.
         _method (str): The method used for bounds computation, set to "CROWN".
         _norm (float): The norm used for perturbation, set to infinity norm.
-        _ptb (PerturbationLpNorm): The perturbation object initialized with the
-            specified norm and epsilon.
 
     Methods:
-        __init__(epsilon: float):
-            Initializes the CROWN plugin with the specified perturbation radius.
+        __init__():
+            Initializes the CROWN plugin.
 
         forward(x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
             Computes the lower and upper bounds for the neural network's output
@@ -38,7 +35,7 @@ class CROWN(MethodPluginABC):
             Args:
                 x (torch.Tensor): The input tensor to the neural network.
                 y (torch.Tensor): An additional input tensor (not used in this implementation).
-                eps (torch.Tensor): A scaling factor for the perturbation radius.
+                eps (torch.Tensor): A perturbation tensor.
 
             Returns:
                 Interval: An object containing the lower and upper bounds for the
@@ -48,15 +45,12 @@ class CROWN(MethodPluginABC):
     def __init__(self, epsilon: float):
         super().__init__()
 
-        self.epsilon = epsilon
-
         self.lirpa_model = None
 
         self._method = "CROWN"
         self._norm = float("inf")
-        self._ptb = PerturbationLpNorm(norm = self._norm, eps = epsilon)
 
-        log.info(f"CROWN plugin initialized for epsilon={self.epsilon}")
+        log.info(f"CROWN plugin initialized.")
 
     def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
         """
@@ -64,17 +58,15 @@ class CROWN(MethodPluginABC):
         Args:
             x (torch.Tensor): The input tensor to the model.
             y (torch.Tensor): An additional input tensor (not used in this implementation).
-            eps (torch.Tensor): A tensor representing the perturbation range. The final radii
-                for the perturbation are computed as `self.epsilon * eps`.
+            eps (torch.Tensor) A perturbation tensor.
 
         Interval: An object containing the lower bound (`lb`) and upper bound (`ub`)
 
         - This method applies a perturbation to the input tensor `x` using the specified
-            Lp-norm and a scaled epsilon value (`eps * self.epsilon`).
+            Lp-norm.
         - The `PerturbationLpNorm` is used to define the perturbation applied to the input.
         """
-        epsilon = eps * self.epsilon
-        ptb = PerturbationLpNorm(norm = self._norm, eps = epsilon)
+        ptb = PerturbationLpNorm(norm = self._norm, eps = eps)
         x = BoundedTensor(x, ptb)
 
         if self.lirpa_model is None:

@@ -19,7 +19,6 @@ class AlphaCROWN(MethodPluginABC):
     to compute certified intervals for neural network outputs under adversarial perturbations.
 
     Attributes:
-       epsilon (float): The perturbation scaling factor.
         gradient_iter (int): The number of iterations for optimizing the bounds during 
             the verification process.
         lr (float): The learning rate for optimizing the alpha parameters in the 
@@ -31,30 +30,26 @@ class AlphaCROWN(MethodPluginABC):
         _method (str): The method name used for bound computation, set to 
             "CROWN-Optimized".
         _norm (float): The norm type used for perturbation analysis, set to infinity norm.
-        _ptb (PerturbationLpNorm): The perturbation object defining the norm and epsilon 
-            for adversarial perturbations.
 
     Methods:
-        __init__(epsilon: float, gradient_iter: int, lr: float) -> None:
+        __init__(gradient_iter: int, lr: float) -> None:
             Initializes the AlphaCROWN plugin with the specified parameters.
 
         forward(x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
             Computes the certified lower and upper bounds for the neural network's output 
-            given an input tensor `x`, a target tensor `y`, and a scaling factor `eps`.
+            given an input tensor `x`, a target tensor `y`, and a perturbation tensor `eps`.
 
             Args:
                 x (torch.Tensor): The input tensor to the neural network.
                 y (torch.Tensor): The target tensor (not used in this method).
-                eps (torch.Tensor): A scaling factor for the perturbation radii.
+                eps (torch.Tensor): Perturbation tensor.
 
             Returns:
                 Interval: An object containing the lower and upper bounds for the 
                 neural network's output under the specified perturbation budget.
     """
-    def __init__(self, epsilon: float, gradient_iter: int, lr: float):
+    def __init__(self, gradient_iter: int, lr: float):
         super().__init__()
-
-        self.epsilon = epsilon
 
         self.lirpa_model = None
         self.gradient_iter = gradient_iter
@@ -62,9 +57,8 @@ class AlphaCROWN(MethodPluginABC):
 
         self._method = "CROWN-Optimized"
         self._norm = float("inf")
-        self._ptb = PerturbationLpNorm(norm = self._norm, eps = epsilon)
 
-        log.info(f"AlphaCROWN plugin initialized for epsilon={self.epsilon}")
+        log.info(f"AlphaCROWN plugin initialized")
 
     def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
         """
@@ -73,8 +67,7 @@ class AlphaCROWN(MethodPluginABC):
         Args:
             x (torch.Tensor): The input tensor to the model.
             y (torch.Tensor): The target tensor (not used in this method).
-            eps (torch.Tensor): A tensor representing the perturbation range. The final radii
-                for the perturbation are computed as `self.epsilon * eps`.
+            eps (torch.Tensor): A perturbation tensor.
 
         Returns:
             Interval: An interval object containing the lower and upper bounds 
@@ -89,8 +82,7 @@ class AlphaCROWN(MethodPluginABC):
               options for bound computation.
             - The bounds are computed using the specified method (`self._method`).
         """
-        epsilon = eps * self.epsilon
-        ptb = PerturbationLpNorm(norm = self._norm, eps = epsilon)
+        ptb = PerturbationLpNorm(norm = self._norm, eps = eps)
         x = BoundedTensor(x, ptb)
 
         if self.lirpa_model is None:

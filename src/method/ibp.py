@@ -21,9 +21,8 @@ class IBP(MethodPluginABC):
     and applies specific interval propagation logic for each supported layer.
     Attributes:
         module (NetworkABC): The neural network module through which intervals will be propagated.
-        epsilon (float): The perturbation scaling factor.
     Methods:
-        __init__(epsilon: float) -> None:
+        __init__() -> None:
             Initializes the IBP class with the given neural network module.
         forward(x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
             Performs interval bound propagation through the layers of the neural network.
@@ -32,19 +31,18 @@ class IBP(MethodPluginABC):
             Args:
                 x (torch.Tensor): The input tensor.
                 y (torch.Tensor): An additional tensor (purpose depends on the specific use case).
-                eps (torch.Tensor): The tensor which will be multiplied by `epsilon` value in `forward` method.
+                eps (torch.Tensor): A perturbation tensor.
             Returns:
                 Interval: The propagated interval bounds.
     """
 
-    def __init__(self, epsilon: float) -> None:
+    def __init__(self) -> None:
         super().__init__()
 
-        self.epsilon = epsilon
         self._layer_handlers = {}
         self._register_handlers()
 
-        log.info(f"IBP plugin initialized for epsilon={self.epsilon}")
+        log.info(f"IBP plugin initialized.")
     
     def _register_handlers(self):
         """
@@ -93,15 +91,14 @@ class IBP(MethodPluginABC):
         ]
 
     def forward(self, x: torch.Tensor, y: torch.Tensor, eps: torch.Tensor) -> Interval:
-        epsilon = self.epsilon * eps
         with torch.no_grad():
             for m in self.module.module.children():
                 for layer in m:
                     for layer_type, handler in self._layer_handlers:
                         if isinstance(layer, layer_type):
-                            x, epsilon = handler(layer, x, epsilon)
+                            x, eps = handler(layer, x, eps)
                             break
-        return Interval(x - epsilon, x + epsilon)
+        return Interval(x - eps, x + eps)
 class IntervalLinear:
     """
     A class that performs interval-based linear transformations for interval arithmetic.
