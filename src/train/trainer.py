@@ -50,7 +50,7 @@ class Trainer:
         self.schedule_total_steps = schedule_epochs * num_batches_per_epoch
         self.schedule_step = 0
 
-        log.info(f"Trainer initialized with epsilon schedule = {self.epsilon_train}, "
+        log.info(f"Trainer initialized with epsilon = {self.epsilon_train}, "
                  f"schedule steps = {self.schedule_total_steps}")
 
     def update_schedule(self, epoch: int) -> None:
