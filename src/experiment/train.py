@@ -44,15 +44,16 @@ def evaluate_split(
     total_samples = 0
     total_correct = 0
     total_pgd_wrong = 0
-    total_verified_error = []
+    total_verified_error: list[float] = []
 
     all_bounds = []
 
-    with torch.no_grad():
-        for _, (X, y) in enumerate(tqdm(dataloader)):
-            X = fabric.to_device(X)
-            y = fabric.to_device(y)
+    for _, (X, y) in enumerate(tqdm(dataloader)):
+        X = fabric.to_device(X)
+        y = fabric.to_device(y)
 
+        # --- No gradients needed for these parts ---
+        with torch.no_grad():
             # Forward pass to get natural loss and bounds
             loss, bounds = trainer.forward(X, y, config)
             total_loss += loss.item() * X.size(0)
@@ -65,59 +66,73 @@ def evaluate_split(
 
             # Robustness verification
             verified_err_batch = compute_verified_error(bounds, y)
-            total_verified_error.append(verified_err_batch)
-
-            # PGD-200 attack
-            adv_x = pgd_linf_attack(method.module, X, y, eps=trainer.epsilon_train, steps=200 if split_name == "test" else 1)
-            y_pred_pgd = torch.argmax(method.module(adv_x), dim=1)
-            total_pgd_wrong += (y_pred_pgd != y).sum().item()
+            verified_err_val = float(verified_err_batch.item() if hasattr(verified_err_batch, "item") else verified_err_batch)
+            total_verified_error.append(verified_err_val)
 
             # Track bound widths
             bound_width = (bounds.upper - bounds.lower)
             all_bounds.append(bound_width.detach().cpu())
 
+        # --- Gradients REQUIRED for PGD attack ---
+        with torch.enable_grad():
+            # PGD-200 attack (or 1 step on non-test)
+            steps = 200 if split_name == "test" else 1
+            # pgd_linf_attack should internally set requires_grad on adv_x,
+            # but at minimum we must NOT be in no_grad() here.
+            adv_x = pgd_linf_attack(
+                method.module, X, y, eps=trainer.epsilon_train, steps=steps
+            )
+            y_pred_pgd = torch.argmax(method.module(adv_x), dim=1)
+            total_pgd_wrong += (y_pred_pgd != y).sum().item()
+
     # Aggregate results
-    avg_loss = total_loss / total_samples
-    clean_error = 100.0 * (1.0 - (total_correct / total_samples))
-    pgd_error = 100.0 * (total_pgd_wrong / total_samples)
-    verified_error = np.mean(total_verified_error)
+    avg_loss = total_loss / max(total_samples, 1)
+    clean_error = 100.0 * (1.0 - (total_correct / max(total_samples, 1)))
+    pgd_error = 100.0 * (total_pgd_wrong / max(total_samples, 1))
+    verified_error = float(np.mean(total_verified_error)) if total_verified_error else 0.0
 
-    all_bounds_tensor = torch.cat(all_bounds)
-    flat_bounds = all_bounds_tensor.flatten().numpy()
-    avg_bound = all_bounds_tensor.mean().item()
-    max_bound = all_bounds_tensor.max().item()
-    min_bound = all_bounds_tensor.min().item()
+    all_bounds_tensor = torch.cat(all_bounds) if len(all_bounds) > 0 else torch.tensor([])
+    if all_bounds_tensor.numel() > 0:
+        flat_bounds = all_bounds_tensor.flatten().numpy()
+        avg_bound = all_bounds_tensor.mean().item()
+        max_bound = all_bounds_tensor.max().item()
+        min_bound = all_bounds_tensor.min().item()
+    else:
+        flat_bounds = np.array([])
+        avg_bound = max_bound = min_bound = 0.0
 
-    # Log to W&B
+    # Log to W&B (ensure JSON/serializable-friendly values)
     wandb.log({
-        f"{split_name}/avg_loss": avg_loss,
-        f"{split_name}/clean_error": clean_error,
-        f"{split_name}/pgd_error": pgd_error,
-        f"{split_name}/verified_error": verified_error,
-        f"{split_name}/avg_bound_width": avg_bound,
-        f"{split_name}/max_bound_width": max_bound,
-        f"{split_name}/min_bound_width": min_bound,
+        f"{split_name}/avg_loss": float(avg_loss),
+        f"{split_name}/clean_error": float(clean_error),
+        f"{split_name}/pgd_error": float(pgd_error),
+        f"{split_name}/verified_error": float(verified_error),
+        f"{split_name}/avg_bound_width": float(avg_bound),
+        f"{split_name}/max_bound_width": float(max_bound),
+        f"{split_name}/min_bound_width": float(min_bound),
         f"{split_name}/bound_width_hist": wandb.Histogram(flat_bounds),
     })
 
     # Console logging
-    print(f"[{split_name.upper()}] Avg Loss: {avg_loss:.6f}, "
-          f"Clean Err: {clean_error:.2f}%, "
-          f"PGD-200 Err: {pgd_error:.2f}%, "
-          f"Verified Err: {verified_error:.2f}%, "
-          f"Avg Bound Width: {avg_bound:.6f}, "
-          f"Max Bound Width: {max_bound:.6f}, Min Bound Width: {min_bound:.6f}, ")
+    print(
+        f"[{split_name.upper()}] Avg Loss: {avg_loss:.6f}, "
+        f"Clean Err: {clean_error:.2f}%, "
+        f"PGD-200 Err: {pgd_error:.2f}%, "
+        f"Verified Err: {verified_error:.2f}%, "
+        f"Avg Bound Width: {avg_bound:.6f}, "
+        f"Max Bound Width: {max_bound:.6f}, "
+        f"Min Bound Width: {min_bound:.6f}"
+    )
 
     return {
-        "avg_loss": avg_loss,
-        "clean_error": clean_error,
-        "pgd_error": pgd_error,
-        "verified_error": verified_error,
-        "avg_bound_width": avg_bound,
-        "max_bound_width": max_bound,
-        "min_bound_width": min_bound
+        "avg_loss": float(avg_loss),
+        "clean_error": float(clean_error),
+        "pgd_error": float(pgd_error),
+        "verified_error": float(verified_error),
+        "avg_bound_width": float(avg_bound),
+        "max_bound_width": float(max_bound),
+        "min_bound_width": float(min_bound),
     }
-
 
 def run(config: DictConfig) -> None:
     """
@@ -320,7 +335,6 @@ def run(config: DictConfig) -> None:
             "val_avg_bound_width": val_stats["avg_bound_width"],
             "val_max_bound_width": val_stats["max_bound_width"],
             "val_min_bound_width": val_stats["min_bound_width"],
-            "val_avg_time_per_image": val_stats["overall_avg_time"],
         })
 
     # Test evaluation
