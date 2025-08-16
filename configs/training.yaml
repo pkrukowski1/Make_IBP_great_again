@@ -6,10 +6,9 @@ defaults:
   - exp: train
 
 training:
-  warmup_start_epoch: 0
-  warmup_end_epoch: 1
-  schedule_epochs_after_warmup: 60
-  epochs: 100
+  warmup_epochs: 10
+  schedule_epochs_after_warmup: 50
+  epochs: 200
   lr: 0.0005
   use_scheduler: False
 

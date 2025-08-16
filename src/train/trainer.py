@@ -22,8 +22,7 @@ class Trainer:
     def __init__(
         self,
         method: MethodPluginABC,
-        warmup_start_epoch: int = 0,
-        warmup_end_epoch: int = 100,
+        warmup_epochs: int = 0,
         schedule_epochs: int = 10,
         num_batches_per_epoch: int = 100,
     ) -> None:
@@ -32,8 +31,7 @@ class Trainer:
 
         Args:
             method (MethodPluginABC): The training method (plugin) with an interval bound forward pass.
-            warmup_start_epoch (int): The first epoch (inclusive) of the warmup phase.
-            warmup_end_epoch (int): The last epoch (exclusive) of the warmup phase.
+            warmup_epochs (int): Number of warmup epochs.
             schedule_epochs (int): Number of epochs to linearly schedule epsilon and kappa after warmup.
             num_batches_per_epoch (int): Number of batches per training epoch.
         """
@@ -43,59 +41,39 @@ class Trainer:
         self.current_epsilon = 0.0
         self.current_kappa = 1.0
 
-        self.warmup_start_epoch = warmup_start_epoch
-        self.warmup_end_epoch = warmup_end_epoch
+        self.warmup_epochs = warmup_epochs
         self.schedule_epochs = schedule_epochs
         self.num_batches_per_epoch = num_batches_per_epoch
 
         self.schedule_total_steps = schedule_epochs * num_batches_per_epoch
         self.schedule_step = 0
-        self.current_epoch = 0
 
         log.info(f"Trainer initialized with epsilon schedule = {self.epsilon_train}, "
                  f"schedule steps = {self.schedule_total_steps}")
 
-    def set_epoch(self, epoch: int) -> None:
+    def update_schedule(self, epoch: int) -> None:
         """
-        Sets the current epoch, resetting the batch step counter and updating initial
-        epsilon and kappa values based on the epoch.
+        Updates epsilon and kappa based on the current epoch and batch progress.
 
         Args:
-            epoch (int): The epoch number to set.
+            epoch (int): Sets the current epoch.
         """
-        self.current_epoch = epoch
-        self.schedule_step = 0
-
-        if epoch < self.warmup_end_epoch:
+        if epoch < self.warmup_epochs:
             self.current_epsilon = 0.0
             self.current_kappa = 1.0
         elif self.schedule_total_steps == 0:
             self.current_epsilon = self.epsilon_train
-            self.current_kappa = 0.0
+            self.current_kappa = 0.5
+        else:
+            progress = min(1.0, self.schedule_step / self.schedule_total_steps)
+            self.current_epsilon = progress * self.epsilon_train
+            self.current_kappa = max(1.0 - progress, 0.5)
+            self.schedule_step += 1
 
         self.method.epsilon = self.current_epsilon
+        log.info(f"[Epoch {epoch}]: epsilon = {self.current_epsilon:.5f}, "
+                f"kappa = {self.current_kappa:.5f}")
 
-        log.info(f"[Epoch {epoch}] Initialized epoch. epsilon = {self.current_epsilon:.5f}, "
-                 f"kappa = {self.current_kappa:.5f}")
-
-    def step_batch_schedule(self):
-        """
-        Updates epsilon and kappa linearly per batch during the scheduling phase.
-        If warmup hasn't ended or schedule is complete, values remain static.
-        """
-        if self.current_epoch < self.warmup_end_epoch:
-            return  # warmup phase
-
-        if self.schedule_step >= self.schedule_total_steps:
-            self.current_epsilon = self.epsilon_train
-            self.current_kappa = 0.0
-            return
-
-        progress = self.schedule_step / self.schedule_total_steps
-        self.current_epsilon = progress * self.epsilon_train
-        self.current_kappa = max(1.0 - progress, 0.0)
-        self.schedule_step += 1
-        self.method.epsilon = self.current_epsilon
 
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, Interval]:
         """
@@ -109,8 +87,6 @@ class Trainer:
         Returns:
             Tuple[torch.Tensor, Interval]: Loss and interval bounds for the batch.
         """
-        if self.method.module.training:
-            self.step_batch_schedule()
         eps = torch.ones_like(x, device=x.device)
         out_bounds = self.method.forward(x, y, eps)
         logits = self.method.module(x)

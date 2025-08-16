@@ -5,5 +5,5 @@ plugins:
   - _target_: method.AffineNN
     epsilon: 0.4
     optimize_bounds: False
-    gradient_iter: 1
-    lr: 0.1
+    gradient_iter: 0
+    lr: null

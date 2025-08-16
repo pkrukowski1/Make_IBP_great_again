@@ -11,12 +11,13 @@ from hydra.utils import instantiate
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from lightning.fabric import Fabric
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from utils.fabric import setup_fabric
 from utils.hydra import extract_output_dir
 from experiment.utils import get_eps, compute_verified_error, pgd_linf_attack
 from dataset.factory import DatasetFactory
+from method.method_plugin_abc import MethodPluginABC
 from train import Trainer
 
 log = logging.getLogger(__name__)
@@ -28,8 +29,7 @@ def evaluate_split(
     dataloader: DataLoader,
     fabric: Fabric,
     trainer: Trainer,
-    method: Any,
-    config: DictConfig
+    method: MethodPluginABC,
 ) -> Dict[str, float]:
     """
     Evaluate model performance on a given dataset split, logging both
@@ -43,10 +43,9 @@ def evaluate_split(
     total_samples = 0
     total_correct = 0
     total_pgd_wrong = 0
-    total_verified_error: List[float] = []
+    total_verified_error = []
 
     all_bounds = []
-    processing_times = []
 
     with torch.no_grad():
         for _, (X, y) in enumerate(tqdm(dataloader)):
@@ -64,18 +63,11 @@ def evaluate_split(
             total_correct += correct
 
             # Robustness verification
-            base_eps = torch.ones_like(X)
-            eps = get_eps(config, fabric.to_device(base_eps))
-            start_time = time.time()
-            int_output_bounds = method.forward(X, y, eps)
-            batch_time = time.time() - start_time
-            processing_times.append(batch_time / X.size(0))
-
-            verified_err_batch = compute_verified_error(int_output_bounds, y)
+            verified_err_batch = compute_verified_error(bounds, y)
             total_verified_error.append(verified_err_batch)
 
             # PGD-200 attack
-            adv_x = pgd_linf_attack(method.module, X, y, eps=eps.item(), steps=200)
+            adv_x = pgd_linf_attack(method.module, X, y, eps=trainer.method.epsilon, steps=200)
             y_pred_pgd = torch.argmax(method.module(adv_x), dim=1)
             total_pgd_wrong += (y_pred_pgd != y).sum().item()
 
@@ -94,7 +86,6 @@ def evaluate_split(
     avg_bound = all_bounds_tensor.mean().item()
     max_bound = all_bounds_tensor.max().item()
     min_bound = all_bounds_tensor.min().item()
-    overall_avg_time = np.mean(processing_times)
 
     # Log to W&B
     wandb.log({
@@ -106,7 +97,6 @@ def evaluate_split(
         f"{split_name}/max_bound_width": max_bound,
         f"{split_name}/min_bound_width": min_bound,
         f"{split_name}/bound_width_hist": wandb.Histogram(flat_bounds),
-        f"{split_name}/overall_avg_processing_time_per_image": overall_avg_time,
     })
 
     # Console logging
@@ -115,8 +105,7 @@ def evaluate_split(
           f"PGD-200 Err: {pgd_error:.2f}%, "
           f"Verified Err: {verified_error:.2f}%, "
           f"Avg Bound Width: {avg_bound:.6f}, "
-          f"Max Bound Width: {max_bound:.6f}, Min Bound Width: {min_bound:.6f}, "
-          f"Avg Proc Time/Image: {overall_avg_time:.6f}s")
+          f"Max Bound Width: {max_bound:.6f}, Min Bound Width: {min_bound:.6f}, ")
 
     return {
         "avg_loss": avg_loss,
@@ -125,8 +114,7 @@ def evaluate_split(
         "verified_error": verified_error,
         "avg_bound_width": avg_bound,
         "max_bound_width": max_bound,
-        "min_bound_width": min_bound,
-        "overall_avg_time": overall_avg_time
+        "min_bound_width": min_bound
     }
 
 
@@ -148,12 +136,12 @@ def run(config: DictConfig) -> None:
     log.info(f'Setting up dataloaders')
 
     train_dataset, val_dataset, test_dataset = DatasetFactory.get_dataset(
-        dataset_type=config.dataset.type,
-        data_path=config.dataset.data_path,
-        flatten=config.dataset.flatten,
-        split_ratio=config.dataset.split_ratio,
-        seed=config.dataset.seed,
-        download=config.dataset.download
+        dataset_type=config.dataset.dataset.type,
+        data_path=config.dataset.dataset.data_path,
+        flatten=config.dataset.dataset.flatten,
+        split_ratio=config.dataset.dataset.split_ratio,
+        seed=config.dataset.dataset.seed,
+        download=config.dataset.dataset.download
     )
 
     train_loader = DataLoader(
@@ -185,43 +173,50 @@ def run(config: DictConfig) -> None:
     log.info(f'Initializing the trainer')
     trainer = Trainer(
         method=method,
-        warmup_start_epoch=config.training.warmup_start_epoch,
-        warmup_end_epoch=config.training.warmup_end_epoch,
+        warmup_epochs=config.training.warmup_epochs,
         schedule_epochs=config.training.schedule_epochs_after_warmup,
         num_batches_per_epoch=len(train_loader)
     )
 
     optimizer = torch.optim.Adam(trainer.method.module.parameters(), lr=config.training.lr)
 
-    epochs: int = config.training.epochs
-    use_scheduler: bool = config.training.get("use_scheduler", False)
+    epochs = config.training.epochs
+    use_scheduler = config.training.get("use_scheduler", False)
     if use_scheduler:
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=5, factor=0.5)
 
-    epoch_logs: List[Dict[str, Any]] = []
-    best_val_loss: float = float("inf")
-    checkpoint_path: str = os.path.join(extracted_output_dir, "best_model.pth")
+    epoch_logs = []
+    best_val_loss = float("inf")
+    processing_times = []
+    checkpoint_path = os.path.join(extracted_output_dir, "best_model.pth")
 
     for epoch in range(epochs):
-        trainer.set_epoch(epoch)
         epoch_loss = 0.0
         total_samples = 0
         total_correct = 0
         total_pgd_wrong = 0
-        total_verified_error: List[float] = []
+        total_verified_error = []
+        batch_processing_times = []
 
         log.info(f"Epoch {epoch+1}/{epochs} — epsilon: {trainer.current_epsilon:.5f}, kappa: {trainer.current_kappa:.5f}")
         print(f"\nEpoch {epoch+1}/{epochs} — epsilon: {trainer.current_epsilon:.5f}, kappa: {trainer.current_kappa:.5f}")
 
         trainer.method.module.train()
         for batch_idx, (X, y) in enumerate(tqdm(train_loader, desc=f"Epoch {epoch+1} — Training")):
+            trainer.update_schedule(epoch)
+
             X = fabric.to_device(X)
             y = fabric.to_device(y)
 
+            start_time = time.time()
+
             loss, bounds = trainer.forward(X, y)
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            optimizer.zero_grad()
+
+            elapsed_time = time.time() - start_time
+            batch_processing_times.append(elapsed_time)
 
             # Clean accuracy
             y_pred = torch.argmax(trainer.method.module(X), dim=1)
@@ -230,13 +225,11 @@ def run(config: DictConfig) -> None:
             batch_accuracy = correct / X.size(0)
 
             # Verified error (batch)
-            eps = get_eps(config, fabric.to_device(torch.ones_like(X)))
-            int_output_bounds = trainer.method.forward(X, y, eps)
-            verified_err_batch = compute_verified_error(int_output_bounds, y)
+            verified_err_batch = compute_verified_error(bounds, y)
             total_verified_error.append(verified_err_batch)
 
             # PGD error (batch)
-            adv_x = pgd_linf_attack(trainer.method.module, X, y, eps=eps.item(), steps=200)
+            adv_x = pgd_linf_attack(trainer.method.module, X, y, eps=trainer.method.epsilon, steps=200)
             y_pred_pgd = torch.argmax(trainer.method.module(adv_x), dim=1)
             total_pgd_wrong += (y_pred_pgd != y).sum().item()
 
@@ -276,12 +269,14 @@ def run(config: DictConfig) -> None:
         train_clean_error = 100.0 * (1.0 - (total_correct / total_samples))
         train_pgd_error = 100.0 * (total_pgd_wrong / total_samples)
         train_verified_error = np.mean(total_verified_error)
+        train_processing_time = np.sum(batch_processing_times)
+        processing_times.append(train_processing_time)
 
         if use_scheduler:
             scheduler.step(avg_train_loss)
 
         # Validation
-        val_stats = evaluate_split("val", val_loader, fabric, trainer, method, config)
+        val_stats = evaluate_split("val", val_loader, fabric, trainer, method)
 
         # Save best model
         if val_stats["avg_loss"] < best_val_loss:
@@ -304,10 +299,12 @@ def run(config: DictConfig) -> None:
             "train/epoch_pgd_error": train_pgd_error,
             "train/epoch_verified_error": train_verified_error,
             "train/epoch": epoch,
+            "train/epoch_elapsed_time": train_processing_time,
         })
 
         epoch_logs.append({
             "epoch": epoch,
+            "train_processing_time": train_processing_time,
             "train_loss": avg_train_loss,
             "train_clean_error": train_clean_error,
             "train_pgd_error": train_pgd_error,
@@ -325,11 +322,17 @@ def run(config: DictConfig) -> None:
         })
 
     # Test evaluation
-    test_stats = evaluate_split("test", test_loader, fabric, trainer, method, config)
+    test_stats = evaluate_split("test", test_loader, fabric, trainer, method)
+
+    total_time = np.sum(processing_times)
+    wandb.log({
+        "total_time": total_time,
+    })
 
     output = {
         "training_log": epoch_logs,
-        "final_test_stats": test_stats
+        "final_test_stats": test_stats,
+        "total_time": total_time
     }
 
     with open(output_file, 'w') as f:

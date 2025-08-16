@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+import torch.nn as nn
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
@@ -186,7 +187,7 @@ def compute_verified_error(bounds: Interval, y: torch.Tensor) -> float:
     return 100.0 * violations.mean().item()
 
 def pgd_linf_attack(
-    model: NetworkABC,
+    model: nn.Module,
     x: torch.Tensor,
     y: torch.Tensor,
     eps: float,
@@ -198,7 +199,7 @@ def pgd_linf_attack(
     Untargeted PGD under L_infty. Returns adversarial examples.
 
     Args:
-        model (NetworkABC): classifier producing logits.
+        model (nn.Module): classifier producing logits.
         x (torch.Tensor): inputs, shape [B, ...], assumed in [clip_min, clip_max]
         y (torch.Tensor): labels, shape [B]
         eps (float): L_infty radius
