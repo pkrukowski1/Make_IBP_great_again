@@ -1,14 +1,13 @@
 import torch
-import torch.nn as nn
+import torch.nn.functional as F
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
 import os
 import uuid
-from typing import Tuple
+from typing import Tuple, Optional
 
 from method.interval_arithmetic import Interval
-from method.method_plugin_abc import MethodPluginABC
 from network.network_abc import NetworkABC
 
 from omegaconf import DictConfig
@@ -19,21 +18,16 @@ def squeeze_batch_dim(tensor: torch.Tensor) -> torch.Tensor:
     """Squeeze batch dimension if batch size is 1, else return unchanged."""
     return tensor.squeeze(0) if tensor.size(0) == 1 else tensor
 
-def get_dataloader(config: DictConfig, fabric, split: str = None) -> DataLoader:
+def get_dataloader(config: DictConfig, fabric) -> DataLoader:
     """
     Initializes and returns a dataloader using the provided configuration and fabric.
     Args:
         config (dict): A configuration object containing the dataset settings.
         fabric (object): An object responsible for setting up dataloaders.
-        split (str, optional): The dataset split to be used (e.g., 'train', 'val', 'test').
-            If provided, it will be used to instantiate the dataset.
     Returns:
         DataLoader: A dataloader instance prepared using the specified configuration and fabric.
     """
-    if split is not None:
-        return fabric.setup_dataloaders(instantiate(config.dataset[split]))
-    else:
-        return fabric.setup_dataloaders(instantiate(config.dataset))
+    return fabric.setup_dataloaders(instantiate(config.dataset))
 
 def verify_point(output_bounds: Interval, y_pred: torch.Tensor, y_gt: torch.Tensor) -> torch.Tensor:
     """
@@ -95,57 +89,6 @@ def check_correct_prediction(module: NetworkABC, x: torch.Tensor, y_gt: torch.Te
     correctly_classified = y_pred == y_gt
     
     return correctly_classified, y_pred
-    
-def add_salt_and_pepper(x: torch.Tensor, amount: float = 0.02, salt_vs_pepper: float = 0.5) -> torch.Tensor:
-    """
-    Adds salt and pepper noise to a tensor, supporting flattened or image-shaped tensors.
-    Automatically adapts to the value range of the input tensor.
-
-    Args:
-        x (torch.Tensor): Input tensor (flattened or shaped), any value range.
-        amount (float): Proportion of values to alter.
-        salt_vs_pepper (float): Proportion of salt noise vs pepper.
-
-    Returns:
-        torch.Tensor: Noisy tensor.
-    """
-    noisy = x.clone()
-    noisy = squeeze_batch_dim(noisy)
-    min_val = noisy.min()
-    max_val = noisy.max()
-
-    if noisy.dim() == 1:
-        num_elements = noisy.numel()
-        num_salt = int(amount * num_elements * salt_vs_pepper)
-        num_pepper = int(amount * num_elements * (1.0 - salt_vs_pepper))
-
-        # Salt
-        indices = torch.randint(0, num_elements, (num_salt,))
-        noisy[indices] = max_val
-
-        # Pepper
-        indices = torch.randint(0, num_elements, (num_pepper,))
-        noisy[indices] = min_val
-
-    else:
-        if noisy.dim() == 3:
-            noisy = noisy.unsqueeze(0)
-        N, C, H, W = noisy.shape
-        num_pixels = H * W
-        num_salt = int(amount * num_pixels * salt_vs_pepper)
-        num_pepper = int(amount * num_pixels * (1.0 - salt_vs_pepper))
-
-        for img in noisy:
-            coords = [torch.randint(0, H, (num_salt,)), torch.randint(0, W, (num_salt,))]
-            img[:, coords[0], coords[1]] = max_val
-
-            coords = [torch.randint(0, H, (num_pepper,)), torch.randint(0, W, (num_pepper,))]
-            img[:, coords[0], coords[1]] = min_val
-
-        if x.dim() == 3:
-            noisy = noisy.squeeze(0)
-
-    return noisy
 
 def save_deteriotated_image(x: torch.Tensor, flatten: bool, folder: str, 
                             dataset: str, path_suffix: str = None) -> None:
@@ -184,39 +127,6 @@ def save_deteriotated_image(x: torch.Tensor, flatten: bool, folder: str,
         img_path = f"{folder}/deteriorated_images/image_{uuid.uuid4().hex[:8]}.png"
     img.save(img_path)
 
-def generate_boundary_points(method: MethodPluginABC, X: torch.Tensor, y: torch.Tensor, 
-                             perturbation: float = 1e-2, grad_steps: int = 3) -> torch.Tensor:
-    """
-    Generates perturbed inputs near the decision boundary by applying
-    small gradient-based perturbations over multiple steps.
-
-    Args:
-        method (MethodPluginABC): The method plugin used for predictions.
-        X (torch.Tensor): The input tensor for which boundary points are to be generated.
-        y (torch.Tensor): The ground truth labels corresponding to the input tensor.
-        perturbation (float, optional): The magnitude of the perturbation to be applied per step. Defaults to 1e-2.
-        grad_steps (int, optional): Number of gradient ascent steps to apply. Defaults to 3.
-
-    Returns:
-        torch.Tensor: A tensor containing the perturbed inputs near the decision boundary.
-    """
-    X_adv = X.clone().detach()
-
-    for _ in range(grad_steps):
-        X_adv.requires_grad_(True)
-        y_pred = method.module(X_adv)
-        loss = torch.nn.functional.cross_entropy(y_pred, y)
-        loss.backward()
-
-        with torch.no_grad():
-            grad = X_adv.grad
-            X_adv = X_adv + perturbation * torch.sign(grad)
-            X_adv = torch.clamp(X_adv, min=0.0, max=1.0)
-        
-        X_adv = X_adv.detach()
-
-    return X_adv
-
 def get_eps(config: DictConfig, eps: torch.Tensor) -> torch.Tensor:
     """
     Adjusts the epsilon tensor by dividing it by the dataset's standard deviation
@@ -239,3 +149,82 @@ def get_eps(config: DictConfig, eps: torch.Tensor) -> torch.Tensor:
         std = torch.tensor(std, device=eps.device).view(1, 3, 1, 1)
         eps = eps / std
     return eps
+
+@torch.no_grad()
+def margin_lowers_from_bounds(bounds: Interval, y: torch.Tensor) -> torch.Tensor:
+    """
+    Compute robust lower bounds on margins z_y - z_j for all j != y
+    from per-logit lower/upper bounds.
+
+    Args:
+        bounds (Interval): Interval with .lower and .upper tensors, shape [B, C]
+        y (torch.Tensor): labels, shape [B]
+
+    Returns:
+        margin_lower (torch.Tensor): [B, C-1], lower bounds on (z_y - z_j) for all j != y
+    """
+    lower, upper = bounds.lower, bounds.upper  # [B, C]
+    B, C = lower.shape
+    arange = torch.arange(B, device=lower.device)
+
+    lower_y = lower[arange, y].unsqueeze(1)       # [B, 1]
+    mask = torch.ones_like(upper, dtype=torch.bool)
+    mask[arange, y] = False
+    upper_others = upper[mask].view(B, C - 1)     # [B, C-1]
+
+    # (z_y - z_j)_lower = lower_y - upper_j
+    margin_lower = lower_y - upper_others         # [B, C-1]
+    return margin_lower
+
+@torch.no_grad()
+def compute_verified_error(bounds: Interval, y: torch.Tensor) -> float:
+    """
+    Verified error: percentage of samples where any margin lower bound < 0.
+    """
+    m_lower = margin_lowers_from_bounds(bounds, y)
+    violations = (m_lower < 0).any(dim=1).float()
+    return 100.0 * violations.mean().item()
+
+def pgd_linf_attack(
+    model: NetworkABC,
+    x: torch.Tensor,
+    y: torch.Tensor,
+    eps: float,
+    steps: int = 200,
+    alpha: Optional[float] = None,
+    clip: Tuple[float, float] = (0.0, 1.0),
+) -> torch.Tensor:
+    """
+    Untargeted PGD under L_infty. Returns adversarial examples.
+
+    Args:
+        model (NetworkABC): classifier producing logits.
+        x (torch.Tensor): inputs, shape [B, ...], assumed in [clip_min, clip_max]
+        y (torch.Tensor): labels, shape [B]
+        eps (float): L_infty radius
+        steps (int): number of PGD steps (default 200)
+        alpha (float): step size; default 2*eps/steps
+        clip (Tuple[float, float]): (min, max) clamp range
+
+    Returns:
+        adv_x (torch.Tensor): adversarial examples
+    """
+    model.eval()
+    clip_min, clip_max = clip
+    if alpha is None:
+        alpha = 2.0 * eps / steps
+
+    # Random start in the Linf ball
+    delta = torch.empty_like(x).uniform_(-eps, eps)
+    adv_x = (x + delta).clamp(clip_min, clip_max).detach().requires_grad_(True)
+
+    for _ in range(steps):
+        logits = model(adv_x)
+        loss = F.cross_entropy(logits, y)
+        grad = torch.autograd.grad(loss, adv_x, retain_graph=False, create_graph=False)[0]
+        adv_x = adv_x.detach() + alpha * torch.sign(grad.detach())
+        # Project to Linf ball around x
+        adv_x = torch.max(torch.min(adv_x, x + eps), x - eps)
+        adv_x = adv_x.clamp(clip_min, clip_max).detach().requires_grad_(True)
+
+    return adv_x.detach()
