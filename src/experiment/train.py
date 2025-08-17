@@ -280,7 +280,6 @@ def run(config: DictConfig) -> None:
                 "train/batch_bound_min": min_bound_width,
                 "train/bound_width_hist": wandb.Histogram(flat_bound_width)
             })
-            break
 
         # Epoch aggregates
         avg_train_loss = epoch_loss / total_samples
