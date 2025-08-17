@@ -16,7 +16,7 @@ from typing import Dict
 from utils.fabric import setup_fabric
 from utils.hydra import extract_output_dir
 from experiment.utils import compute_verified_error, pgd_linf_attack
-from dataset.factory import DatasetFactory
+from dataset.dataset_factory import DatasetFactory
 from method.method_plugin_abc import MethodPluginABC
 from train import Trainer
 
@@ -280,6 +280,7 @@ def run(config: DictConfig) -> None:
                 "train/batch_bound_min": min_bound_width,
                 "train/bound_width_hist": wandb.Histogram(flat_bound_width)
             })
+            break
 
         # Epoch aggregates
         avg_train_loss = epoch_loss / total_samples
