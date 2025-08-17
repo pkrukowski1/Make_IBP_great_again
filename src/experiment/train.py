@@ -211,7 +211,6 @@ def run(config: DictConfig) -> None:
         epoch_loss = 0.0
         total_samples = 0
         total_correct = 0
-        total_pgd_wrong = 0
         total_verified_error = []
         batch_processing_times = []
 
@@ -245,16 +244,9 @@ def run(config: DictConfig) -> None:
             verified_err_batch = compute_verified_error(bounds, y)
             total_verified_error.append(verified_err_batch)
 
-            # PGD error (batch)
-            adv_x = pgd_linf_attack(trainer.method.module, X, y, eps=trainer.epsilon_train, steps=1)
-            y_pred_pgd = torch.argmax(trainer.method.module(adv_x), dim=1)
-            total_pgd_wrong += (y_pred_pgd != y).sum().item()
-
-            robust_accuracy = 1.0 - (verified_err_batch / 100.0)
-
             # Logging to console
             print(f"[Batch {batch_idx+1}] Loss: {loss.item():.6f} | Acc: {batch_accuracy:.4f} | "
-                  f"PGD Err: {100*(1-robust_accuracy):.2f}% | Verified Err: {verified_err_batch:.2f}%")
+                  f"Verified Err: {verified_err_batch:.2f}%")
 
             epoch_loss += loss.item() * X.size(0)
             total_samples += X.size(0)
@@ -273,7 +265,6 @@ def run(config: DictConfig) -> None:
                 "train/kappa": trainer.current_kappa,
                 "train/epoch": epoch,
                 "train/batch_clean_error": 100.0 * (1.0 - batch_accuracy),
-                "train/batch_pgd_error": 100.0 * (y_pred_pgd != y).float().mean().item(),
                 "train/batch_verified_error": verified_err_batch,
                 "train/batch_bound_avg": avg_bound_width,
                 "train/batch_bound_max": max_bound_width,
@@ -284,7 +275,6 @@ def run(config: DictConfig) -> None:
         # Epoch aggregates
         avg_train_loss = epoch_loss / total_samples
         train_clean_error = 100.0 * (1.0 - (total_correct / total_samples))
-        train_pgd_error = 100.0 * (total_pgd_wrong / total_samples)
         train_verified_error = np.mean(total_verified_error)
         train_processing_time = np.sum(batch_processing_times)
         processing_times.append(train_processing_time)
@@ -313,7 +303,6 @@ def run(config: DictConfig) -> None:
         wandb.log({
             "train/epoch_loss": avg_train_loss,
             "train/epoch_clean_error": train_clean_error,
-            "train/epoch_pgd_error": train_pgd_error,
             "train/epoch_verified_error": train_verified_error,
             "train/epoch": epoch,
             "train/epoch_elapsed_time": train_processing_time,
@@ -324,7 +313,6 @@ def run(config: DictConfig) -> None:
             "train_processing_time": train_processing_time,
             "train_loss": avg_train_loss,
             "train_clean_error": train_clean_error,
-            "train_pgd_error": train_pgd_error,
             "train_verified_error": train_verified_error,
             "train_epsilon": trainer.current_epsilon,
             "train_kappa": trainer.current_kappa,
