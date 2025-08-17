@@ -9,7 +9,7 @@ training:
   warmup_epochs: 10
   schedule_epochs_after_warmup: 50
   epochs: 200
-  lr: 0.0005
+  lr: 0.01
   use_scheduler: True
   kappa_end: 0.5
   eps_train: 0.2

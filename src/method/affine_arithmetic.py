@@ -107,7 +107,6 @@ class AffineNN(MethodPluginABC):
 
         relu_param_idx = 0  # Track which learnable ReLU param to use
         relu_loss = 0.0
-
         for m in self.module.module.children():
             for idx_layer, layer in enumerate(m):
                 if isinstance(layer, nn.Conv2d):
@@ -372,7 +371,6 @@ class AffineFunc:
         c = self.to_interval()
 
         eps = 1e-8
-
         mask1 = c <= 0
         mask2 = c >= 0
         mask3 = torch.logical_not(torch.logical_or(mask1, mask2))
@@ -387,7 +385,7 @@ class AffineFunc:
 
         a0 = self.coeffs[..., 0]
         S = torch.sum(torch.abs(self.coeffs[..., 1:]), axis=-1)
-
+      
         # Avoid division by zero
         safe_S = torch.where(S == 0, torch.tensor(eps, device=DEVICE), S)
 
@@ -468,10 +466,11 @@ class AffineFunc:
         return g
     
     def conv2d(self, conv_layer: nn.Conv2d):
-        x = self.coeffs.permute(4, 0, 1, 2, 3)
-        n_affine_vars, batch_size, in_channels, height, width = x.shape
-        x = x.reshape(n_affine_vars * batch_size, in_channels, height, width)
-       
+        x = self.coeffs.permute(4, 0, 1, 2, 3)  # [n_affine_vars, batch_size, in_channels, H, W]
+        n_affine_vars, batch_size, in_channels, H, W = x.shape
+
+        x = x.reshape(n_affine_vars * batch_size, in_channels, H, W)
+
         x = F.conv2d(
             x,
             weight=conv_layer.weight,
@@ -481,8 +480,10 @@ class AffineFunc:
             dilation=conv_layer.dilation,
             groups=conv_layer.groups
         )
-       
-        x = x.reshape(n_affine_vars, batch_size, conv_layer.out_channels, x.shape[-2], x.shape[-1])
+
+        out_channels, H, W = x.shape[1], x.shape[2], x.shape[3]
+        x = x.reshape(n_affine_vars, batch_size, out_channels, H, W)
+
         x = x.permute(1, 2, 3, 4, 0)
 
         if conv_layer.bias is not None:
@@ -547,22 +548,42 @@ class AffineExpr:
             c = c + f.coeffs[..., 0]
             mid, q = c.split()
             f.coeffs[..., 0] = mid
-            r = torch.maximum(torch.abs(q.lower.flatten()), torch.abs(q.upper.flatten()))
-            r = torch.diag(r).reshape((*c.lower.shape, r.numel()))
-            self.current += c.lower.numel()
-            f.coeffs = torch.concatenate((f.coeffs, r), axis=-1)
+
+            B = q.lower.size(0)
+            D = q.lower[0].numel()
+            spatial = c.lower.shape[1:]
+
+            r = torch.maximum(q.lower.view(B, D).abs(), q.upper.view(B, D).abs())
+
+            r_diag = torch.diag_embed(r)
+
+            coeffs_flat = f.coeffs.view(B, D, -1)
+            coeffs_flat = torch.cat([coeffs_flat, r_diag], dim=-1)
+            f.coeffs = coeffs_flat.view(B, *spatial, coeffs_flat.size(-1))
+
+            self.current += D
         else:
-            mask = torch.nonzero(mask, as_tuple=True)
-            mask_a0 = (*mask, torch.zeros_like(mask[0]))
+            mask_idx = torch.nonzero(mask, as_tuple=True)
+
+            mask_a0 = (*mask_idx, torch.zeros_like(mask_idx[0]))
             c = c + f.coeffs[mask_a0]
             mid, q = c.split()
+
             f.coeffs[mask_a0] = mid
+
             r = torch.maximum(torch.abs(q.lower), torch.abs(q.upper))
-            r = torch.diag(r)
-            new_var = torch.zeros((*f.coeffs.shape[:-1], c.lower.numel())).to(DEVICE)
-            new_var[mask] = r
-            self.current += c.lower.numel()
-            f.coeffs = torch.concatenate((f.coeffs, new_var), axis=-1)
+            r_diag = torch.diag_embed(r)
+
+            B, *spatial, _ = f.coeffs.shape
+            M = r.shape[0]
+            new_var = torch.zeros((*f.coeffs.shape[:-1], M), device=f.coeffs.device)
+
+            for i, m in enumerate(zip(*mask_idx)):
+                new_var[m][i] = r[i]
+
+            self.current += M
+            f.coeffs = torch.cat((f.coeffs, new_var), dim=-1)
+
 
     def new_vector(self, u: Interval):
         shape = (*u.lower.shape, 1)
