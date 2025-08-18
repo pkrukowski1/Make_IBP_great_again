@@ -28,13 +28,13 @@ parameters:
   dataset.dataset.download:
     value: true  
   dataset.train_batch_size:
-    values: [16, 32, 64]
+    values: [16, 32]
   dataset.val_batch_size:
     value: 32
   dataset.test_batch_size:
     value: 32
   dataset.num_workers:
-    value: 4
+    value: 0
 
   exp.seed:
     value: 1
@@ -78,7 +78,7 @@ parameters:
   training.schedule_epochs_after_warmup:
     value: 50
   training.epochs:
-    value: 200
+    value: 100
   training.lr:
     value: 5e-4
   training.use_scheduler:

@@ -34,7 +34,7 @@ parameters:
   dataset.test_batch_size:
     value: 32
   dataset.num_workers:
-    value: 4
+    value: 0
 
   exp.seed:
     value: 1
