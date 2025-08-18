@@ -7,3 +7,4 @@ from .alpha_crown_model_defs.sdp_model_loader import SDPModelLoader
 
 from .crown_ibp_model_defs.conv4layers import Conv4Layers
 from .crown_ibp_model_defs.dm_small import DMSmall
+from .crown_ibp_model_defs.dm_medium import DMMedium

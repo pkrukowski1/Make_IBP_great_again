@@ -6,7 +6,7 @@ dataset:
   seed: 1
   download: true
 
-train_batch_size: 100
+train_batch_size: 16
 val_batch_size: 1
 test_batch_size: 1
 num_workers: 4
