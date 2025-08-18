@@ -15,7 +15,7 @@ from typing import Dict
 
 from utils.fabric import setup_fabric
 from utils.hydra import extract_output_dir
-from experiment.utils import compute_verified_error, pgd_linf_attack
+from experiment.utils import compute_verified_error
 from dataset.dataset_factory import DatasetFactory
 from method.method_plugin_abc import MethodPluginABC
 from train import Trainer
@@ -43,7 +43,6 @@ def evaluate_split(
     total_loss = 0.0
     total_samples = 0
     total_correct = 0
-    total_pgd_wrong = 0
     total_verified_error: list[float] = []
 
     all_bounds = []
@@ -73,22 +72,9 @@ def evaluate_split(
             bound_width = (bounds.upper - bounds.lower)
             all_bounds.append(bound_width.detach().cpu())
 
-        # --- Gradients REQUIRED for PGD attack ---
-        with torch.enable_grad():
-            # PGD-200 attack (or 1 step on non-test)
-            steps = 200 if split_name == "test" else 1
-            # pgd_linf_attack should internally set requires_grad on adv_x,
-            # but at minimum we must NOT be in no_grad() here.
-            adv_x = pgd_linf_attack(
-                method.module, X, y, eps=trainer.epsilon_train, steps=steps
-            )
-            y_pred_pgd = torch.argmax(method.module(adv_x), dim=1)
-            total_pgd_wrong += (y_pred_pgd != y).sum().item()
-
     # Aggregate results
     avg_loss = total_loss / max(total_samples, 1)
     clean_error = 100.0 * (1.0 - (total_correct / max(total_samples, 1)))
-    pgd_error = 100.0 * (total_pgd_wrong / max(total_samples, 1))
     verified_error = float(np.mean(total_verified_error)) if total_verified_error else 0.0
 
     all_bounds_tensor = torch.cat(all_bounds) if len(all_bounds) > 0 else torch.tensor([])
@@ -105,7 +91,6 @@ def evaluate_split(
     wandb.log({
         f"{split_name}/avg_loss": float(avg_loss),
         f"{split_name}/clean_error": float(clean_error),
-        f"{split_name}/pgd_error": float(pgd_error),
         f"{split_name}/verified_error": float(verified_error),
         f"{split_name}/avg_bound_width": float(avg_bound),
         f"{split_name}/max_bound_width": float(max_bound),
@@ -117,7 +102,6 @@ def evaluate_split(
     print(
         f"[{split_name.upper()}] Avg Loss: {avg_loss:.6f}, "
         f"Clean Err: {clean_error:.2f}%, "
-        f"PGD-200 Err: {pgd_error:.2f}%, "
         f"Verified Err: {verified_error:.2f}%, "
         f"Avg Bound Width: {avg_bound:.6f}, "
         f"Max Bound Width: {max_bound:.6f}, "
@@ -127,7 +111,6 @@ def evaluate_split(
     return {
         "avg_loss": float(avg_loss),
         "clean_error": float(clean_error),
-        "pgd_error": float(pgd_error),
         "verified_error": float(verified_error),
         "avg_bound_width": float(avg_bound),
         "max_bound_width": float(max_bound),
@@ -318,7 +301,6 @@ def run(config: DictConfig) -> None:
             "train_kappa": trainer.current_kappa,
             "val_loss": val_stats["avg_loss"],
             "val_clean_error": val_stats["clean_error"],
-            "val_pgd_error": val_stats["pgd_error"],
             "val_verified_error": val_stats["verified_error"],
             "val_avg_bound_width": val_stats["avg_bound_width"],
             "val_max_bound_width": val_stats["max_bound_width"],
