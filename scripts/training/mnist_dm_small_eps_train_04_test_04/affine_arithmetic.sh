@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=RAVEN_affine_arithmetic_training
-#SBATCH --qos=normal
+#SBATCH --qos=batch
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --partition=rtx4090
+#SBATCH --partition=rtx4090_batch
 
 source scripts/main.sh
 
