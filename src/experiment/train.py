@@ -198,7 +198,6 @@ def run(config: DictConfig) -> None:
         batch_processing_times = []
 
         log.info(f"Epoch {epoch+1}/{epochs} — epsilon: {trainer.current_epsilon:.5f}, kappa: {trainer.current_kappa:.5f}")
-        print(f"\nEpoch {epoch+1}/{epochs} — epsilon: {trainer.current_epsilon:.5f}, kappa: {trainer.current_kappa:.5f}")
 
         trainer.method.module.train()
         for batch_idx, (X, y) in enumerate(tqdm(train_loader, desc=f"Epoch {epoch+1} — Training")):
