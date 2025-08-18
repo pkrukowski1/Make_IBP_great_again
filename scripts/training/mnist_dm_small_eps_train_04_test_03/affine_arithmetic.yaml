@@ -30,9 +30,9 @@ parameters:
   dataset.train_batch_size:
     values: [16, 32, 64]
   dataset.val_batch_size:
-    value: 32
+    value: 16
   dataset.test_batch_size:
-    value: 32
+    value: 16
   dataset.num_workers:
     value: 0
 
