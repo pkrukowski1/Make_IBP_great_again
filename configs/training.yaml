@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - network: dm_medium
+  - network: dm_large
   - dataset: mnist
   - method: composer_affine_arithmetic
   - exp: train
