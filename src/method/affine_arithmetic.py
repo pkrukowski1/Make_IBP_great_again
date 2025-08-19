@@ -376,7 +376,7 @@ class AffineFunc:
         mask3 = torch.logical_not(torch.logical_or(mask1, mask2))
 
         if slope is not None:
-            e = slope
+            e = 0.5*(torch.tanh(slope) + 1.0)
         else:
             denom = torch.where(c.diam() == 0, torch.tensor(eps, device=DEVICE), c.diam())
             e = torch.clamp(c.upper / denom , max=torch.tensor(1.0, device=DEVICE))
