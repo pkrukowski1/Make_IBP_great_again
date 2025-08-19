@@ -568,7 +568,6 @@ class AffineExpr:
             mask_a0 = (*mask_idx, torch.zeros_like(mask_idx[0]))
             c = c + f.coeffs[mask_a0]
             mid, q = c.split()
-
             f.coeffs[mask_a0] = mid
 
             r = torch.maximum(torch.abs(q.lower), torch.abs(q.upper))
@@ -576,10 +575,10 @@ class AffineExpr:
 
             B, *spatial, _ = f.coeffs.shape
             M = r.shape[0]
+
             new_var = torch.zeros((*f.coeffs.shape[:-1], M), device=f.coeffs.device)
 
-            for i, m in enumerate(zip(*mask_idx)):
-                new_var[m][i] = r[i]
+            new_var[mask] = r_diag.reshape(-1, M)
 
             self.current += M
             f.coeffs = torch.cat((f.coeffs, new_var), dim=-1)
