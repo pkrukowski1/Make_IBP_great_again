@@ -577,8 +577,8 @@ class AffineExpr:
             M = r.shape[0]
 
             new_var = torch.zeros((*f.coeffs.shape[:-1], M), device=f.coeffs.device)
-
-            new_var[mask] = r_diag.reshape(-1, M)
+            if M > 0:
+                new_var[mask] = r_diag.reshape(-1, M)
 
             self.current += M
             f.coeffs = torch.cat((f.coeffs, new_var), dim=-1)
