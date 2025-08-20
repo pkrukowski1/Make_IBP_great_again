@@ -78,8 +78,8 @@ class Trainer:
             self.current_kappa = max(1.0 - progress, self.kappa_end)
             self.schedule_step += 1
 
-        log.info(f"[Epoch {epoch}]: epsilon = {self.current_epsilon:.5f}, "
-                f"kappa = {self.current_kappa:.5f}")
+        # log.info(f"[Epoch {epoch}]: epsilon = {self.current_epsilon:.5f}, "
+        #         f"kappa = {self.current_kappa:.5f}")
 
 
     def forward(self, x: torch.Tensor, y: torch.Tensor, config: DictConfig) -> Tuple[torch.Tensor, Interval]:
