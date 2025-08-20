@@ -254,6 +254,10 @@ def run(config: DictConfig) -> None:
                 "train/bound_width_hist": wandb.Histogram(flat_bound_width)
             })
 
+            # clean up per-batch variables to release refs
+            del loss, bounds, bound_width, flat_bound_width, y_pred
+            torch.cuda.empty_cache()
+
         # Epoch aggregates
         avg_train_loss = epoch_loss / total_samples
         train_clean_error = 100.0 * (1.0 - (total_correct / total_samples))
@@ -305,6 +309,8 @@ def run(config: DictConfig) -> None:
             "val_max_bound_width": val_stats["max_bound_width"],
             "val_min_bound_width": val_stats["min_bound_width"],
         })
+
+        torch.cuda.empty_cache()
 
     # Test evaluation
     test_stats = evaluate_split("test", test_loader, fabric, trainer, method, config)
