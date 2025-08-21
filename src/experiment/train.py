@@ -190,6 +190,8 @@ def run(config: DictConfig) -> None:
     processing_times = []
     checkpoint_path = os.path.join(extracted_output_dir, "best_model.pth")
 
+    n_steps = config.training.get("n_steps", 1)
+
     for epoch in range(epochs):
         epoch_loss = 0.0
         total_samples = 0
@@ -209,9 +211,12 @@ def run(config: DictConfig) -> None:
             start_time = time.time()
 
             loss, bounds = trainer.forward(X, y, config)
-            optimizer.zero_grad()
+            loss = loss / n_steps
             loss.backward()
-            optimizer.step()
+
+            if (batch_idx + 1) % n_steps == 0 or (batch_idx + 1) == len(train_loader):
+                optimizer.step()
+                optimizer.zero_grad()
 
             elapsed_time = time.time() - start_time
             batch_processing_times.append(elapsed_time)
