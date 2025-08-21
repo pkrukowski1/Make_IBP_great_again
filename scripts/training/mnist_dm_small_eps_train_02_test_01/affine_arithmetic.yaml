@@ -89,6 +89,8 @@ parameters:
     value: 0.2
   training.eps_test:
     value: 0.1
+  training.n_steps:
+    value: 4
 
   ### W&B logging
   wandb.entity:
