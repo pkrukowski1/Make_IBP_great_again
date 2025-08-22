@@ -6,4 +6,3 @@ plugins:
     optimize_bounds: False
     gradient_iter: 0
     lr: null
-    max_vars: 1570 # if null, no constraint on number of variables
