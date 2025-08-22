@@ -231,10 +231,6 @@ def run(config: DictConfig) -> None:
             verified_err_batch = compute_verified_error(bounds, y)
             total_verified_error.append(verified_err_batch)
 
-            # # Logging to console
-            # print(f"[Batch {batch_idx+1}] Loss: {loss.item():.6f} | Acc: {batch_accuracy:.4f} | "
-            #       f"Verified Err: {verified_err_batch:.2f}%")
-
             epoch_loss += loss.item() * X.size(0)
             total_samples += X.size(0)
 
@@ -259,8 +255,6 @@ def run(config: DictConfig) -> None:
                 "train/bound_width_hist": wandb.Histogram(flat_bound_width)
             })
 
-            # clean up per-batch variables to release refs
-            del loss, bounds, bound_width, flat_bound_width, y_pred
             torch.cuda.empty_cache()
 
         # Epoch aggregates
