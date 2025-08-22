@@ -125,7 +125,7 @@ class AffineNN(MethodPluginABC):
                         affine_func, _ = affine_func.relu(None)
                 elif isinstance(layer, nn.Flatten):
                     affine_func = affine_func.flatten()
-        print(affine_func.coeffs.shape)
+
         return affine_func.to_interval(), relu_loss
     
     def tighten_up_intervals(self, z_L: torch.Tensor, z_U: torch.Tensor) -> torch.Tensor:
