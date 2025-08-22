@@ -23,9 +23,10 @@ class AffineNN(MethodPluginABC):
         optimize_bounds (bool): Flag indicating whether to optimize bounds using gradient-based methods.
         gradient_iter (int): Number of gradient iterations for optimizing bounds (required if optimize_bounds is True).
         lr (float): Learning rate for the optimizer used in bounds optimization.
+        max_vars (int or None): Maximum number of affine variables allowed. If None, no constraint is applied.
 
     Methods:
-        __init__(optimize_bounds: bool, gradient_iter: int = 0, lr: float = 0.1):
+        __init__(optimize_bounds: bool, gradient_iter: int = 0, lr: float = 0.1, max_vars: int = None):
             Initializes the AffineNN object with the given parameters.
         get_bounds(x: torch.Tensor, eps: torch.Tensor) -> Interval:
             Computes the affine arithmetic bounds for the input tensor `x` with perturbation `eps`.
@@ -62,6 +63,7 @@ class AffineNN(MethodPluginABC):
     def __init__(self, optimize_bounds: bool, 
                  gradient_iter: int = 0,
                  lr: float = 0.1,
+                 max_vars: int = None
                  ):
         
         super().__init__()
@@ -73,6 +75,7 @@ class AffineNN(MethodPluginABC):
         
         self.gradient_iter = gradient_iter
         self.lr = lr
+        self.max_vars = max_vars
 
         log.info(f"Initialized Affine Arithmetic object with optimize_bounds={optimize_bounds}")
 
@@ -101,7 +104,7 @@ class AffineNN(MethodPluginABC):
         """
         
         zl, zu = x - eps, x + eps
-        expr = AffineExpr()
+        expr = AffineExpr(self.max_vars)
         interval = Interval(zl, zu)
         affine_func = expr.new_tensor(interval)
 
@@ -125,6 +128,7 @@ class AffineNN(MethodPluginABC):
                         affine_func, _ = affine_func.relu(None)
                 elif isinstance(layer, nn.Flatten):
                     affine_func = affine_func.flatten()
+        print(affine_func.coeffs.shape)
         return affine_func.to_interval(), relu_loss
     
     def tighten_up_intervals(self, z_L: torch.Tensor, z_U: torch.Tensor) -> torch.Tensor:
@@ -514,8 +518,9 @@ class AffineExpr:
     to manage affine functions and their coefficients.
     Methods
     -------
-    __init__():
+    __init__(max_vars: int = None):
         Initializes the AffineExpr object with a counter for tracking the current variable index.
+        Additionally, it accepts a parameter `max_vars` to limit the maximum number of affine variables.
     add_var(f: AffineFunc, c: Interval, mask: torch.Tensor = None):
         Adds a variable with an interval coefficient to the affine function. If a mask is provided,
         the operation is applied selectively based on the mask.
@@ -537,8 +542,48 @@ class AffineExpr:
         - AffineFunc: A new affine function tensor.
     """
 
-    def __init__(self):
+    def __init__(self, max_vars: int = None):
         self.current = 0
+        self.max_vars = max_vars if max_vars is not None else float('inf')
+
+    def _symbol_importance(self, coeffs: torch.Tensor) -> torch.Tensor:
+        """
+        Computes the importance of each affine variable based on the average absolute value of its coefficients.
+
+        Args:
+            coeffs (torch.Tensor): A tensor of shape [B, ..., n_vars] representing the coefficients of affine variables.
+        Returns:
+            torch.Tensor: A tensor of shape [n_vars] containing the importance of each affine variable.
+        """
+        # coeffs: [B, ..., n_vars]
+        reduce_dims = tuple(range(coeffs.ndim - 1))
+        return coeffs.abs().mean(dim=reduce_dims)
+    
+    def _merge_symbols(self, coeffs: torch.Tensor) -> torch.Tensor:
+        """
+        Merges less important affine variables to reduce the total number of variables.
+
+        Args:
+            coeffs (torch.Tensor): A tensor of shape [B, ..., n_vars] representing the coefficients of affine variables.
+        Returns:
+            torch.Tensor: A tensor of shape [B, ..., max_vars] with merged affine variables.
+        """
+        n_vars = coeffs.shape[-1]
+
+        if n_vars <= self.max_vars:
+            return coeffs
+        
+        importance = self._symbol_importance(coeffs)  # [n_vars]
+        sorted_idx = torch.argsort(importance)
+        
+        keep_idx = sorted_idx[-(self.max_vars-1):]
+        merge_idx = sorted_idx[:n_vars - self.max_vars + 1]
+        
+        merged = coeffs[..., merge_idx].abs().sum(dim=-1, keepdim=True)
+        merged = merged * torch.sign(coeffs[..., merge_idx].sum(dim=-1, keepdim=True))
+        
+        coeffs_new = torch.cat([coeffs[..., keep_idx], merged], dim=-1)
+        return coeffs_new
 
     def add_var(self, f: AffineFunc, c: Interval, mask: torch.Tensor = None):
         """
@@ -582,6 +627,10 @@ class AffineExpr:
 
             self.current += M
             f.coeffs = torch.cat((f.coeffs, new_var), dim=-1)
+        
+        # Merge symbols if too many
+        if f.coeffs.shape[-1] > self.max_vars:
+            f.coeffs = self._merge_symbols(f.coeffs)
 
 
     def new_vector(self, u: Interval):
