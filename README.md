@@ -57,7 +57,7 @@ You can launch an experiment by running, for example:
 
 ```bash
 ./scripts/dm_small_eps_02_01/training.sh
-
+```
 
 ## Acknowledgements
 - Project Structure based on [template](https://github.com/sobieskibj/templates/tree/master) by Bartłomiej Sobieski
