@@ -44,7 +44,7 @@ You can choose from the following configuration files:
 - **training.yaml** – Select a training method (such as AA, IBP, or CROWN) for training a neural network. All metrics used in the [CROWN-IBP](https://arxiv.org/pdf/1906.06316) paper will be logged.
 - **affine_arithmetic.yaml** – Compute output bounds using the AA (Affine Arithmetic) method.
 - **ibp.yaml** – Compute output bounds using the Interval Bound Propagation (IBP) method.
-- **alpha_crown.yaml** – Compute output bounds using the α-CROWN method.
+- **alpha_crown.yaml** – Compute output bounds using the $\alpha$-CROWN method.
 - **crown.yaml** – Compute output bounds using the CROWN method.
 - **lower_bound.yaml** – Compute output bounds by taking the interval hull over images of points sampled from the input hypercube.
 
