@@ -11,10 +11,9 @@ The Affine Arithmetic (AA) method is able to reduce the wrapping effect compared
 ![Working scheme of the AA and IBP methods](./imgs/teaser.png)
 
 ## Datasets
-For the experiments and ablation study, we use 4 publicly available datasets:
+For the experiments and ablation study, we use 2 publicly available datasets:
 * [MNIST](https://pytorch.org/vision/stable/generated/torchvision.datasets.MNIST.html)
 * [CIFAR-10](https://pytorch.org/vision/stable/generated/torchvision.datasets.CIFAR10.html) 
-* [Digits](https://scikit-learn.org/stable/auto_examples/datasets/plot_digits_last_image.html)
 
 
 The datasets may be downloaded when the algorithm runs.
@@ -33,6 +32,32 @@ edit .env
 conda activate IBP_great_again
 WANDB_MODE={offline/online} HYDRA_FULL_ERROR={0/1} python src/main.py --config-name config 
 ```
+
+## Configuration and Experiments
+
+This project supports multiple configuration files for training and verification. Each config defines how bounds are computed or how the neural network is trained.
+
+### Config Files
+
+You can choose from the following configuration files:
+
+- **training.yaml** – Select a training method (such as AA, IBP, or CROWN) for training a neural network. All metrics used in the [CROWN-IBP](https://arxiv.org/pdf/1906.06316) paper will be logged.
+- **affine_arithmetic.yaml** – Compute output bounds using the AA (Affine Arithmetic) method.
+- **ibp.yaml** – Compute output bounds using the Interval Bound Propagation (IBP) method.
+- **alpha_crown.yaml** – Compute output bounds using the α-CROWN method.
+- **crown.yaml** – Compute output bounds using the CROWN method.
+- **lower_bound.yaml** – Compute output bounds by taking the interval hull over images of points sampled from the input hypercube.
+
+---
+
+### Predefined Experiments
+
+Some predefined experiments are available in the `scripts` folder.  
+You can launch an experiment by running, for example:
+
+```bash
+./scripts/dm_small_eps_02_01/training.sh
+
 
 ## Acknowledgements
 - Project Structure based on [template](https://github.com/sobieskibj/templates/tree/master) by Bartłomiej Sobieski
